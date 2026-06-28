@@ -430,6 +430,18 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .sa-prio b{color:var(--tx)}
 .tjpick:disabled,.tjpick.tjp-block{opacity:.45; cursor:not-allowed}
 .dd-d{font-size:11px; color:var(--tx3); white-space:nowrap; margin-right:.2rem}
+/* Fondo / Reserva + cerrar quincena */
+.fondo-box{margin-top:1rem; background:var(--line2); border-radius:var(--rad-sm); padding:.9rem 1rem}
+.fondo-row{display:flex; justify-content:space-between; align-items:center; gap:.6rem}
+.fondo-lbl{font-size:13px; color:var(--tx)}
+.fondo-hint{font-size:11px; color:var(--tx3); display:block}
+.fondo-val{font-size:14px; color:var(--tx2); white-space:nowrap}
+.fondo-val input{width:92px; font:inherit; font-size:15px; font-weight:600; text-align:right; color:var(--tx); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:.35rem .5rem}
+.fondo-val input:focus{outline:none; border-color:var(--accent)}
+.fondo-note{font-size:12px; color:var(--tx2); line-height:1.5; margin-top:.6rem}
+.fondo-note b{color:var(--tx); font-variant-numeric:tabular-nums}
+.fondo-close{display:block; width:100%; margin-top:.85rem; font:inherit; font-size:13px; font-weight:600; color:#fff; background:var(--accent); border:none; border-radius:9px; padding:.6rem; cursor:pointer}
+.fondo-close:hover{filter:brightness(1.08)}
 </style>
 </head>
 <body>
@@ -493,7 +505,7 @@ function addCycle(type){
   switchCycle(id);
 }
 let tjOpen=null; // "g-i" de la línea con el selector de tarjeta abierto
-// Modo guiado por escenas: Ahorro → Lujos → Necesidades → Plan quincenal.
+// Modo guiado por escenas: Ahorro → Gustos → Necesidades → Plan quincenal.
 const WIZ=['sec-aho','sec-luj','sec-nec','planbox'];
 let wizStep=0;
 let showRollover=false; // true = muestra el reparto 50/30/20 arriba de cada caja
@@ -504,10 +516,10 @@ let incEdit=false; // editar/agregar ingreso (oculto por defecto; el ingreso se 
 let view='inicio'; // tab activo: inicio (las 3 cajas) | plan | deudas | informe
 // Modo enfocado (wizard): una sola caja a la vez. Arranca APAGADO → se ve el overview de las 3 cajas.
 let focusMode=false, focusStep=0, lastOver=0;
-const FOCUS_LABELS={'sec-inc':'Sueldo','sec-aho':'Ahorro y deudas','sec-luj':'Lujos','sec-nec':'Necesidades','sec-balance':'Resumen y sobrante'};
+const FOCUS_LABELS={'sec-inc':'Sueldo','sec-aho':'Ahorro y deudas','sec-luj':'Gustos','sec-nec':'Necesidades','sec-balance':'Resumen y sobrante'};
 const ALL_SCENES=['sec-inc','sec-aho','sec-luj','sec-nec','sec-balance'];
 function focusScenes(){
-  // Si el ahorro se excede (por deuda), Lujos va primero — es lo primero que se sacrifica.
+  // Si el ahorro se excede (por deuda), Gustos va primero — es lo primero que se sacrifica.
   const tail = lastOver>0.5 ? ['sec-luj','sec-nec'] : ['sec-nec','sec-luj'];
   return ['sec-inc','sec-aho',tail[0],tail[1],'sec-balance'];
 }
@@ -611,6 +623,19 @@ function templatesH(){
 }
 
 let history=[];
+// Fondo / Reserva: ahorros pre-existentes. El resultado de cada quincena (sobró/faltó) suma o resta aquí.
+let fondo=parseFloat(localStorage.getItem('midas_fondo'))||0;
+function saveFondo(){localStorage.setItem('midas_fondo',String(fondo));}
+function cerrarQuincena(){
+  const res=lastSaldo||0;
+  if(!confirm('¿Cerrar esta quincena? Su resultado ('+(res>=0?'+ ':'− ')+pe(Math.abs(res))+') se aplica a tu Fondo, y pasamos a la siguiente.'))return;
+  snapshot();
+  fondo+=res; saveFondo();
+  d.closed=true; save();
+  const idx=cycles.findIndex(c=>c.id===activeQ);
+  if(idx>=0 && idx<cycles.length-1){ switchCycle(cycles[idx+1].id); }
+  else { addCycle(cycleOf(activeQ).type); }
+}
 function snapshot(){history.push(JSON.stringify({d:d,debts:(typeof debts!=='undefined'?debts:[])}));if(history.length>50)history.shift();updateUndo();}
 function updateUndo(){const u=document.getElementById('undo');if(u)u.hidden=history.length===0;}
 const pe=n=>'S/ '+Math.round(n).toLocaleString('es-PE');
@@ -619,7 +644,7 @@ const sum=a=>a.reduce((t,r)=>t+(parseFloat(r.a)||0),0);
 const sumCash=a=>a.reduce((t,r)=>t+(hasSubs(r)?(r.tj?0:r.sub.reduce((u,s)=>u+(s.tj?0:(parseFloat(s.a)||0)),0)):(r.tj?0:(parseFloat(r.a)||0))),0);
 const sumTj=a=>a.reduce((t,r)=>t+(hasSubs(r)?(r.tj?(parseFloat(r.a)||0):r.sub.reduce((u,s)=>u+(s.tj?(parseFloat(s.a)||0):0),0)):(r.tj?(parseFloat(r.a)||0):0)),0);
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-const buckets=[['aho','Ahorro + Inversión',.2],['nec','Necesidades',.5],['luj','Lujos / diversión',.3]];
+const buckets=[['aho','Ahorro + Inversión',.2],['nec','Necesidades',.5],['luj','Gustos / diversión',.3]];
 const hasSubs=r=>r.sub&&r.sub.length>0;
 
 const TJ_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>';
@@ -683,7 +708,7 @@ function rowH(g,i,r){
   return h;
 }
 
-const WIZBTN={aho:[1,'Continuar → Lujos'],luj:[2,'Continuar → Necesidades'],nec:[3,'Continuar → Plan quincenal']};
+const WIZBTN={aho:[1,'Continuar → Gustos'],luj:[2,'Continuar → Necesidades'],nec:[3,'Continuar → Plan quincenal']};
 function bucketH(g,name,pct,num){
   let rows=d[g].map((r,i)=>rowH(g,i,r)).join('');
   const w=WIZBTN[g];
@@ -691,7 +716,7 @@ function bucketH(g,name,pct,num){
   const col=collapsed[g];
   return '<div class="sec'+(col?' is-collapsed':'')+'" id="sec-'+g+'">'+
     '<div class="sec-h tappable" data-collapse="'+g+'" title="Plegar/desplegar"><span class="tw"><span class="num num-'+g+'">'+num+'</span><span class="t">'+name+'</span></span><span class="sec-r"><span class="pct">'+Math.round(pct*100)+'%</span><span class="chev">'+(col?'▸':'▾')+'</span></span></div>'+
-    (g==='aho'&&!col?'<div class="sec-note">Págrate primero — esto sale antes de gastar.</div>':'')+
+    (g==='aho'&&!col?'<div class="sec-note">Págate primero — esto sale antes de gastar.</div>':'')+
     '<div class="meta">Meta <b id="tg-'+g+'"></b> · Gastado <b id="sm-'+g+'"></b> <span class="tag" id="tag-'+g+'"></span><span class="eaten" id="eaten-'+g+'"></span></div>'+
     '<div class="bar"><div class="bar-fill" id="bar-'+g+'"></div></div>'+
     '<div class="rollbonus" id="roll-'+g+'"></div>'+
@@ -733,7 +758,7 @@ function render(){
       '<div class="heart-h">Libre para gastar esta quincena</div>'+
       '<div class="heart-grid">'+
         '<div class="heart-c"><span class="hc-lbl">Necesidades</span><b class="hc-val" id="heart-nec">&mdash;</b><span class="hc-sub">para gastar</span></div>'+
-        '<div class="heart-c"><span class="hc-lbl">Lujos</span><b class="hc-val" id="heart-luj">&mdash;</b><span class="hc-sub">para gastar</span></div>'+
+        '<div class="heart-c"><span class="hc-lbl">Gustos</span><b class="hc-val" id="heart-luj">&mdash;</b><span class="hc-sub">para gastar</span></div>'+
         '<div class="heart-c"><span class="hc-lbl">Ahorro</span><b class="hc-val aho" id="heart-aho">&mdash;</b><span class="hc-sub" id="heart-aho-sub"></span></div>'+
       '</div>'+
     '</div>'+
@@ -747,6 +772,11 @@ function render(){
           '<div class="bcard"><div class="lbl" id="b-sl-l">Saldo libre</div><div class="val" id="b-sl"></div></div>'+
         '</div>'+
         '<div id="assign-wrap"></div>'+
+        '<div class="fondo-box">'+
+          '<div class="fondo-row"><span class="fondo-lbl">Fondo / Reserva<span class="fondo-hint">tus ahorros ya existentes</span></span><span class="fondo-val">S/ <input id="fondo-inp" type="number" min="0" step="1" value="'+fondo+'"></span></div>'+
+          '<div class="fondo-note" id="fondo-note"></div>'+
+          '<button class="fondo-close" data-cerrar="1">Cerrar quincena y pasar a la siguiente →</button>'+
+        '</div>'+
       '</div>'+
     '</div>'+
     '<div class="sec" id="sec-informe"><div class="sec-h"><span class="t">Informe</span></div><div id="informe-body"></div></div>'+
@@ -771,7 +801,7 @@ function informeH(){
   const bar=(label,v,cls)=>'<div class="inf-row"><span class="inf-l">'+label+'</span><span class="inf-track"><span class="inf-fill '+cls+'" style="width:'+Math.min(pct(v),100)+'%"></span></span><span class="inf-v">'+pe(v)+' <i>'+pct(v)+'%</i></span></div>';
   let h='<div class="inf-h">A dónde va tu plata esta quincena</div>';
   h+=bar('Necesidades (efectivo)',necCash,'c-nec');
-  h+=bar('Lujos (efectivo)',lujCash,'c-luj');
+  h+=bar('Gustos (efectivo)',lujCash,'c-luj');
   h+=bar('Ahorro (Fondo + Inversión)',ahoSav,'c-aho');
   h+=bar('Deuda (pago de mínimos)',debtPay,'c-deu');
   h+='<div class="inf-tot">Destinas <b>'+pe(total)+'</b> de <b>'+pe(ti)+'</b> de ingreso'+(ti-total>0.5?' · te queda <b>'+pe(ti-total)+'</b> libre':'')+'</div>';
@@ -808,10 +838,10 @@ function recompute(){
     bar.style.background=over?'var(--bad)':'var(--ok)';
   });
   // Cascada: el excedente de Ahorro (el MISMO "excede" del bucket, act-tgt, incluye deuda)
-  // se come primero Lujos, luego Necesidades. Indicador único por bucket que cambia de signo:
+  // se come primero Gustos, luego Necesidades. Indicador único por bucket que cambia de signo:
   // neto = meta − gastado − comido_por_cascada. >0 = libre (verde), <0 = déficit (rojo).
   const overTotal=Math.max((acts.aho||0)-(tgts.aho||0),0);
-  lastOver=overTotal; // para decidir el orden del wizard (Lujos primero si hay exceso)
+  lastOver=overTotal; // para decidir el orden del wizard (Gustos primero si hay exceso)
   let over=overTotal;
   const eatenLuj=Math.min(over,tgts.luj||0);over-=eatenLuj;
   const eatenNec=Math.min(over,tgts.nec||0);
@@ -832,7 +862,7 @@ function recompute(){
       else{el.className='eaten';el.textContent='';}
     }});
   const ahoEl=document.getElementById('eaten-aho');
-  if(ahoEl){ahoEl.className='eaten neutral';ahoEl.textContent=overTotal>0.5?' · baja '+pe(overTotal)+' a Lujos y Necesidades':'';}
+  if(ahoEl){ahoEl.className='eaten neutral';ahoEl.textContent=overTotal>0.5?' · baja '+pe(overTotal)+' a Gustos y Necesidades':'';}
   // Corazón — "Libre para gastar" por sección. nec/luj = lo que te queda para gastar; ahorro = lo que apartas vs tu meta.
   (function(){
     const setHC=(id,v)=>{const e=document.getElementById(id);if(e){e.textContent=pe(v);e.classList.toggle('neg',v<-0.5);}};
@@ -847,6 +877,10 @@ function recompute(){
   sl.textContent=pe(saldo);
   sl.style.color=saldo>=0?'var(--ok)':'var(--bad)';
   document.getElementById('b-sl-l').textContent=saldo>=0?'Saldo libre':'Déficit';
+  const fn=document.getElementById('fondo-note');
+  if(fn){ fn.innerHTML = saldo<-0.5
+    ? 'Tu déficit de <b>'+pe(-saldo)+'</b> saldría de tu fondo → quedarían <b>'+pe(fondo+saldo)+'</b>'+(fondo+saldo<0?' <span style="color:var(--bad)">(¡el fondo no alcanza!)</span>':'')
+    : (saldo>0.5?'Tu sobrante de <b>'+pe(saldo)+'</b> se sumaría a tu fondo (quedaría <b>'+pe(fondo+saldo)+'</b>)':'Esta quincena cierra en cero.'); }
   // Rollover GUARDADO: muestra arriba de cada caja el monto disponible que quedó fijado
   // al hacer el rollover (d.rollover). Persiste — no se recalcula en vivo.
   // Rollover DINÁMICO: reparte el saldo libre ACTUAL. Si pagas más deuda y baja el saldo, baja/desaparece solo.
@@ -866,7 +900,7 @@ function recompute(){
     ? '<div class="sp-h">Tu reparto 50/30/20</div>'+
       '<div class="sp-grid"><div class="sp-c"><span>Ahorro</span><b>'+pe(ti*.2)+'</b><i>20%</i></div>'+
       '<div class="sp-c"><span>Necesidades</span><b>'+pe(ti*.5)+'</b><i>50%</i></div>'+
-      '<div class="sp-c"><span>Lujos</span><b>'+pe(ti*.3)+'</b><i>30%</i></div></div>'+
+      '<div class="sp-c"><span>Gustos</span><b>'+pe(ti*.3)+'</b><i>30%</i></div></div>'+
       '<div class="sp-note">Regla popularizada por Elizabeth Warren (<i>All Your Worth</i>) — simple y sostenible. Y lo primero: <b>págate primero</b>, ahorrar antes de gastar (<i>El hombre más rico de Babilonia</i>).</div>'
     : '<div class="sp-note">Pon tu sueldo arriba y verás el reparto 50/30/20 al instante.</div>';
   if(typeof applyView==='function')applyView();
@@ -903,6 +937,7 @@ document.getElementById('cyclebar').addEventListener('click',e=>{const b=e.targe
 
 const app=document.getElementById('app');
 app.addEventListener('input',e=>{const t=e.target;
+  if(t.id==='fondo-inp'){fondo=parseFloat(t.value)||0;saveFondo();recompute();return;}
   if(t.dataset&&t.dataset.loan!==undefined){const i=+t.dataset.loan,f=t.dataset.lf;if(debts[i]){debts[i][f]=t.value;saveDebts();recompute();}return;}
   if(t.dataset&&t.dataset.payday!==undefined){const yr=parseInt((t.value.split('-')[0])||'0',10);
     if(t.value && (yr<2000||yr>2100))return; // ignorar años absurdos hasta que la fecha esté completa
@@ -994,6 +1029,7 @@ app.addEventListener('click',e=>{
   else if(b.dataset.loadtpl!==undefined){const n=b.dataset.loadtpl;const tiene=(d.nec&&d.nec.some(r=>(parseFloat(r.a)||0)>0||(r.sub&&r.sub.length)))||(d.inc&&sum(d.inc)>0);if(!tiene||confirm('¿Cargar la plantilla "'+n+'"? Reemplaza las categorías de esta quincena.'))applyTemplate(n);}
   else if(b.dataset.deltpl!==undefined){const n=b.dataset.deltpl;if(confirm('¿Borrar la plantilla "'+n+'"?')){saveTpls(loadTemplates().filter(x=>x.name!==n));render();}}
   else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
+  else if(b.dataset.cerrar){cerrarQuincena();}
   else if(b.dataset.reset){if(confirm('¿Reiniciar esta quincena? Se borran los montos actuales.')){snapshot();d=def();save();render();}}
   else if(b.dataset.openpicker){pickerOpen=b.dataset.openpicker;debtForm=null;render();}
   else if(b.dataset.pickerclose){pickerOpen=null;debtForm=null;render();}
@@ -1150,7 +1186,7 @@ function waterfallH(p){
   let h='<div class="wf-box"><div class="wf-h">Cómo se reparte tu efectivo de esta quincena</div>';
   h+=line('Te pagan','+ '+pe(p.inc));
   h+=line('− Necesidades en efectivo','− '+pe(p.nec));
-  h+=line('− Lujos en efectivo','− '+pe(p.luj));
+  h+=line('− Gustos en efectivo','− '+pe(p.luj));
   if(p.tarj>0.5)h+='<div class="wf-note">'+pe(p.tarj)+' lo mandaste a tarjeta → no sale de tu efectivo hoy; vuelve como cuota desde el próximo mes. Por eso ese dinero queda para deudas, no para más lujo.</div>';
   h+=line('= Queda para deudas',pe(p.forDebt),'tot');
   h+=line('− Mínimos de todas las deudas','− '+pe(p.minTotal));
