@@ -881,7 +881,7 @@ function assignPanelH(saldo,abOpen){
     '<div class="assign-amt-wrap"><label>Monto a asignar</label>'+
       '<input id="assign-amt" type="number" min="0" step="1" value="'+v+'"></div>'+
     '<div class="assign-btns">'+
-      '<button data-rollover="1" class="'+(showRollover?'active':'')+'">↻ '+(showRollover?'Salir del rollover':'Rollover')+'<span class="n">'+(showRollover?'ocultar el reparto en las cajas':'reparte 50/30/20 arriba de cada caja')+'</span></button>'+
+      '<button data-rollover="1" class="'+(showRollover?'active':'')+'">↻ '+(showRollover?'Quitar el reparto':'Repartir el sobrante')+'<span class="n">'+(showRollover?'ocultar el reparto en las cajas':'reparte 50/30/20 arriba de cada caja')+'</span></button>'+
       '<button data-assign="emer">🛟 Colchón<span class="n">fondo de emergencia</span></button>'+
       '<button data-abono="1" class="'+(abOpen?'active':'')+'">💳 Abono<span class="n">pagar deuda</span></button>'+
     '</div>';
@@ -1143,7 +1143,7 @@ function planRowH(r){
   return '<div class="pl'+(r.paid?' is-paid':'')+'">'+
     '<button class="pcheck'+(r.paid?' on':'')+'" data-paid="'+esc(r.n)+'" title="'+(r.paid?'Pagado — clic para desmarcar':'Marcar como pagado')+'">'+(r.paid?'✓':'')+'</button>'+
     tag+'<span class="nm">'+esc(r.n)+'<span class="due"> · vence '+dueLabel(r.vence)+'</span><span class="why">'+esc(r.why||'')+'</span></span>'+
-    '<span class="amt">'+pe(r.pay)+(r.revolve>0.5?' <span style="color:var(--bad)">· revuelve '+pe(r.revolve)+'</span>':'')+'</span></div>';
+    '<span class="amt">'+pe(r.pay)+(r.revolve>0.5?' <span style="color:var(--bad)">· revolvente '+pe(r.revolve)+'</span>':'')+'</span></div>';
 }
 function waterfallH(p){
   const line=(l,v,cls)=>'<div class="wf'+(cls?' '+cls:'')+'"><span>'+l+'</span><span>'+v+'</span></div>';
@@ -1170,7 +1170,7 @@ function planInner(p){
   if(p.perQ){const left=p.poolInit||0;
     h+='<div class="hero-left"><div class="hl-lbl">Te quedó libre tras pagar los mínimos</div>'+
        '<div class="hl-val'+(left>0.5?'':' zero')+'">'+pe(left)+'</div>'+
-       '<div class="hl-sub">'+(left>0.5?'tuyo para abonar, colchón o rollover':'no sobró nada esta quincena')+'</div></div>';}
+       '<div class="hl-sub">'+(left>0.5?'tuyo para abonar, colchón o repartir':'no sobró nada esta quincena')+'</div></div>';}
   h+='<details class="plan-detail"'+(p.perQ?'':' open')+'><summary>Ver detalle del plan</summary>';
   h+='<div class="'+b[0]+'" style="margin-top:.7rem">'+b[1]+'</div>';
   if(p.perQ){
@@ -1187,7 +1187,7 @@ function planInner(p){
   h+=p.rows.map(planRowH).join('');
   if(p.suggest)h+='<div class="dnote" style="margin:.7rem 0 0; color:var(--accent)">&#128161; Te sobran <b>'+pe(p.poolInit)+'</b> para abonar. Sugerencia: ponlos en <b>'+esc(p.suggest.card)+'</b>'+(p.suggest.clears?' → la dejas en CERO y liberas su línea.':' → bajaría a '+pe(p.suggest.leaves)+' (es la más cercana a cero).')+'</div>';
   const revTxt = p.revolveSum>0.5
-    ? (p.statusCode==='red' ? ' · Revuelve <b style="color:var(--bad)">'+pe(p.revolveSum)+'</b>'
+    ? (p.statusCode==='red' ? ' · Revolvente <b style="color:var(--bad)">'+pe(p.revolveSum)+'</b>'
         : ' · Sigue en tarjetas, al día <b>'+pe(p.revolveSum)+'</b> <span style="color:var(--tx3)">(baja con tu ingreso que sube)</span>')
     : ' · <b style="color:var(--ok)">nada queda pendiente</b>';
   h+='<div class="plan-sum">Pagas esta quincena <b>'+pe(p.paySum)+'</b>'+revTxt+(p.perQ&&p.outCount>0?' · <span style="color:var(--tx3)">'+p.outCount+' en otra quincena</span>':'')+'</div>';
