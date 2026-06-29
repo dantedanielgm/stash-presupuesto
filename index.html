@@ -1356,16 +1356,23 @@ function debtAmt(x,mode){
   if(mode==='mes')return parseFloat(x.mes)||parseFloat(x.min)||0;
   return parseFloat(x.min)||0;
 }
-function debtPaySum(){if(!d.debtPay)return 0;return debts.filter(x=>!x.auto).reduce((t,x)=>t+(d.debtPay[x.n]?debtAmt(x,d.debtPay[x.n]):0),0);}
+function debtPaySum(){if(!d.debtPay)return 0;return debts.filter(x=>!x.auto).reduce((t,x)=>{
+  if(!d.debtPay[x.n])return t;
+  if(d.paid&&d.paid[x.n]&&d.paidAmt&&d.paidAmt[x.n]!=null)return t+(parseFloat(d.paidAmt[x.n])||0); // ya pagada: usa el monto pagado (su mín quedó en blanco)
+  return t+debtAmt(x,d.debtPay[x.n]);
+},0);}
 // Asentar un pago de deuda: al marcar ✓, baja el saldo de esa deuda en el banco (se arrastra a los
 // siguientes ciclos). Al desmarcar, lo devuelve exacto. Guarda el monto aplicado para revertir bien.
 function toggleDebtPaid(name){
-  if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={}; if(!d.paidDelta)d.paidDelta={};
+  if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={}; if(!d.paidDelta)d.paidDelta={}; if(!d.paidFields)d.paidFields={};
   const x=debts.find(z=>z.n===name);
-  if(d.paid[name]){ // destildar: restaura el saldo por lo que realmente bajó
+  if(d.paid[name]){ // destildar: restaura saldo y los campos de pago que el banco recalcula
     snapshot();
-    if(x&&!x.auto){const delta=parseFloat(d.paidDelta[name])||0; x.total=(parseFloat(x.total)||0)+delta;}
-    delete d.paid[name]; delete d.paidAmt[name]; delete d.paidDelta[name];
+    if(x&&!x.auto){
+      const delta=parseFloat(d.paidDelta[name])||0; x.total=(parseFloat(x.total)||0)+delta;
+      const pf=d.paidFields[name]; if(pf){x.min=pf.min;x.mes=pf.mes;x.disp=pf.disp;}
+    }
+    delete d.paid[name]; delete d.paidAmt[name]; delete d.paidDelta[name]; delete d.paidFields[name];
   } else { // marcar: asienta el pago. pago = lo que pagaste (cuenta como real); delta = cuánto bajó el saldo (editable por el interés)
     let pago=0, delta=0;
     if(x&&!x.auto){
@@ -1375,6 +1382,8 @@ function toggleDebtPaid(name){
       if(inp===null) return; // canceló: no marcar ni tocar saldos
       const nuevo=parseFloat(inp), newTotal=isNaN(nuevo)?sugerido:Math.max(nuevo,0);
       delta=old-newTotal; snapshot(); x.total=newTotal;
+      // el banco recalcula mínimo/pago del mes/disponible con el nuevo saldo → los dejo en blanco para rellenar el próximo ciclo con tu estado de cuenta
+      d.paidFields[name]={min:x.min,mes:x.mes,disp:x.disp}; x.min=''; x.mes=''; x.disp='';
     } else { snapshot(); }
     d.paid[name]=true; d.paidAmt[name]=pago; d.paidDelta[name]=delta;
   }
