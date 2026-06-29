@@ -568,7 +568,7 @@ function renderCycleBar(){
     '<button class="q-tab addcyc" data-addcycle="m" title="Agregar mes">+ Mes</button>';
 }
 function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);showRollover=!!(d&&d.rollover&&d.rollover.saldo>0);
-  view='inicio'; // cambiar de ciclo siempre lleva al corazón (las 3 cajas)
+  // se mantiene la tab actual (Inicio/Resumen/Deudas/Invertir) al cambiar de ciclo — no resetear a Inicio
   localStorage.setItem('midas_active_cycle',activeQ);history=[];render();renderDebts();updateUndo();}
 function addCycle(type){
   const withDates=cycles.map(c=>dateVal(cyclePayday(c.id))).filter(s=>!isNaN(s)&&s<9e15);
