@@ -706,10 +706,12 @@ let history=[];
 let fondo=parseFloat(localStorage.getItem('midas_fondo'))||0;
 function saveFondo(){localStorage.setItem('midas_fondo',String(fondo));}
 function cerrarQuincena(){
-  const res=lastSaldo||0;
-  if(!confirm('¿Cerrar esta quincena? Su resultado ('+(res>=0?'+ ':'− ')+pe(Math.abs(res))+') se aplica a tu Fondo, y pasamos a la siguiente.'))return;
+  const ingreso=sum(d.inc);
+  const real=(typeof ejecutadoSum==='function')?ejecutadoSum():0;
+  const aReserva=ingreso-real; // lo no gastado de verdad (incl. presupuesto no materializado) se libera a la Reserva
+  if(!confirm('¿Cerrar este ciclo?\n\nGastado real (lo marcado ✓): '+pe(real)+'\nLo no usado pasa a tu Reserva: '+(aReserva>=0?'+ ':'− ')+pe(Math.abs(aReserva))+'\n\nEl siguiente ciclo arranca de cero con su propio presupuesto.'))return;
   snapshot();
-  fondo+=res; saveFondo();
+  fondo+=aReserva; saveFondo();
   d.closed=true; save();
   const idx=cycles.findIndex(c=>c.id===activeQ);
   if(idx>=0 && idx<cycles.length-1){ switchCycle(cycles[idx+1].id); }
@@ -968,9 +970,8 @@ function recompute(){
   sl.style.color=saldo>=0?'var(--ok)':'var(--bad)';
   document.getElementById('b-sl-l').textContent=saldo>=0?'Saldo libre':'Déficit';
   const fn=document.getElementById('fondo-note');
-  if(fn){ fn.innerHTML = saldo<-0.5
-    ? 'Tu déficit de <b>'+pe(-saldo)+'</b> saldría de tu fondo → quedarían <b>'+pe(fondo+saldo)+'</b>'+(fondo+saldo<0?' <span style="color:var(--bad)">(¡el fondo no alcanza!)</span>':'')
-    : (saldo>0.5?'Tu sobrante de <b>'+pe(saldo)+'</b> se sumaría a tu fondo (quedaría <b>'+pe(fondo+saldo)+'</b>)':'Esta quincena cierra en cero.'); }
+  if(fn){ const real=(typeof ejecutadoSum==='function')?ejecutadoSum():0; const aRes=ti-real;
+    fn.innerHTML='Al cerrar: gastaste <b>'+pe(real)+'</b> de verdad (lo marcado ✓) → lo no usado (<b>'+pe(aRes)+'</b>) pasa a tu Reserva, quedaría <b>'+pe(fondo+aRes)+'</b>'+(aRes<-0.5?' <span style="color:var(--bad)">(gastaste más que tu ingreso)</span>':'')+'.'; }
   // Rollover GUARDADO: muestra arriba de cada caja el monto disponible que quedó fijado
   // al hacer el rollover (d.rollover). Persiste — no se recalcula en vivo.
   // Rollover DINÁMICO: reparte el saldo libre ACTUAL. Si pagas más deuda y baja el saldo, baja/desaparece solo.
@@ -1359,15 +1360,23 @@ function debtPaySum(){if(!d.debtPay)return 0;return debts.filter(x=>!x.auto).red
 // Asentar un pago de deuda: al marcar ✓, baja el saldo de esa deuda en el banco (se arrastra a los
 // siguientes ciclos). Al desmarcar, lo devuelve exacto. Guarda el monto aplicado para revertir bien.
 function toggleDebtPaid(name){
-  if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={};
+  if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={}; if(!d.paidDelta)d.paidDelta={};
   const x=debts.find(z=>z.n===name);
-  snapshot();
-  if(d.paid[name]){
-    if(x&&!x.auto){const amt=parseFloat(d.paidAmt[name])||0; x.total=(parseFloat(x.total)||0)+amt;}
-    delete d.paid[name]; delete d.paidAmt[name];
-  } else {
-    if(x&&!x.auto){const amt=debtAmt(x,(d.debtPay&&d.debtPay[name])||'min'); x.total=Math.max((parseFloat(x.total)||0)-amt,0); d.paidAmt[name]=amt;}
-    d.paid[name]=true;
+  if(d.paid[name]){ // destildar: restaura el saldo por lo que realmente bajó
+    snapshot();
+    if(x&&!x.auto){const delta=parseFloat(d.paidDelta[name])||0; x.total=(parseFloat(x.total)||0)+delta;}
+    delete d.paid[name]; delete d.paidAmt[name]; delete d.paidDelta[name];
+  } else { // marcar: asienta el pago. pago = lo que pagaste (cuenta como real); delta = cuánto bajó el saldo (editable por el interés)
+    let pago=0, delta=0;
+    if(x&&!x.auto){
+      pago=debtAmt(x,(d.debtPay&&d.debtPay[name])||'min');
+      const old=parseFloat(x.total)||0, sugerido=Math.max(old-pago,0);
+      const inp=prompt('Pagaste '+pe(pago)+' a "'+name+'".\n\nNuevo saldo de la deuda — ojo: el pago mínimo casi no baja el saldo por el interés. Ajústalo con tu estado de cuenta si quieres:', Math.round(sugerido));
+      if(inp===null) return; // canceló: no marcar ni tocar saldos
+      const nuevo=parseFloat(inp), newTotal=isNaN(nuevo)?sugerido:Math.max(nuevo,0);
+      delta=old-newTotal; snapshot(); x.total=newTotal;
+    } else { snapshot(); }
+    d.paid[name]=true; d.paidAmt[name]=pago; d.paidDelta[name]=delta;
   }
   saveDebts(); save(); render(); if(typeof renderDebts==='function')renderDebts();
 }
