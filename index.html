@@ -329,18 +329,20 @@ body.focuson .ov-bar{display:none}
 /* Corazón — "Libre para gastar" por sección (lo primero que ves al abrir) */
 .heart{background:var(--card); border:1px solid var(--line); border-radius:var(--rad); box-shadow:var(--shadow); padding:1.1rem 1.1rem 1.2rem; margin:.4rem 0 1.6rem}
 .heart-h{font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:var(--tx2); text-align:center; margin-bottom:1rem}
+html,body{overflow-x:hidden}
 .heart-rows{display:flex; flex-direction:column}
-.hrow{padding:.7rem 0; border-bottom:1px solid var(--line)}
+.hrow{padding:.6rem 0; border-bottom:1px solid var(--line)}
 .hrow:first-child{padding-top:0}
-.hrow:last-child{border-bottom:none; padding-bottom:0}
-.hr-top{display:flex; justify-content:space-between; align-items:baseline; gap:.5rem}
-.hr-lbl{font-size:13px; color:var(--tx2); font-weight:600}
-.hr-left{font-size:15.5px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.01em; text-align:right; white-space:nowrap}
-.hr-left.pos{color:var(--ok)}
-.hr-left.neg{color:var(--bad)}
-.hr-left.aho{color:var(--tx3); font-size:11.5px; font-weight:500; font-style:italic}
-.hr-spent{font-size:12px; color:var(--tx3); margin-top:.2rem}
-.hr-spent b{color:var(--tx2); font-weight:700; font-variant-numeric:tabular-nums}
+.hrow:last-child{border-bottom:none}
+.hr-top{display:flex; justify-content:space-between; align-items:baseline; gap:.6rem}
+.hr-lbl{font-size:13px; color:var(--tx2); font-weight:600; flex-shrink:0}
+.hr-amt{font-size:14px; color:var(--tx2); text-align:right; min-width:0}
+.hr-amt b{color:var(--tx); font-weight:700; font-variant-numeric:tabular-nums}
+.hr-amt.aho{color:var(--tx3); font-size:12.5px}
+.hr-amt.aho b{color:var(--tx2)}
+.hr-over{font-size:12px; color:var(--bad); font-weight:600; margin-top:.2rem; text-align:right}
+.heart-total{display:flex; justify-content:space-between; align-items:baseline; gap:.6rem; margin-top:.85rem; padding-top:.7rem; border-top:1.5px solid var(--line2); font-size:13px; color:var(--tx2); font-weight:600}
+.heart-total b{color:var(--tx); font-weight:800; font-variant-numeric:tabular-nums}
 body.focuson #heart{display:none}
 /* Bienvenida — primer arranque: elegir ciclo antes de ver nada */
 .welcome{position:fixed; inset:0; z-index:100; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:1.5rem}
@@ -831,12 +833,13 @@ function render(){
       '</div>'+
     '</div>'+
     '<div class="heart" id="heart">'+
-      '<div class="heart-h">Te queda para gastar · este ciclo</div>'+
+      '<div class="heart-h">Gastado · este ciclo</div>'+
       '<div class="heart-rows">'+
-        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Necesidades</span><span class="hr-left" id="hleft-nec">&mdash;</span></div><div class="hr-spent" id="hspent-nec"></div></div>'+
-        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Gustos</span><span class="hr-left" id="hleft-luj">&mdash;</span></div><div class="hr-spent" id="hspent-luj"></div></div>'+
-        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Ahorro</span><span class="hr-left aho" id="hleft-aho"></span></div><div class="hr-spent" id="hspent-aho"></div></div>'+
+        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Necesidades</span><span class="hr-amt" id="hamt-nec">&mdash;</span></div><div class="hr-over" id="hover-nec" style="display:none"></div></div>'+
+        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Gustos</span><span class="hr-amt" id="hamt-luj">&mdash;</span></div><div class="hr-over" id="hover-luj" style="display:none"></div></div>'+
+        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Ahorro</span><span class="hr-amt aho" id="hamt-aho">&mdash;</span></div></div>'+
       '</div>'+
+      '<div class="heart-total"><span>Total gastado</span><span id="hamt-total">&mdash;</span></div>'+
     '</div>'+
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
     '<div class="sec'+(collapsed.balance?' is-collapsed':'')+'" id="sec-balance">'+
@@ -938,22 +941,19 @@ function recompute(){
     }});
   const ahoEl=document.getElementById('eaten-aho');
   if(ahoEl){ahoEl.className='eaten neutral';ahoEl.textContent=overTotal>0.5?' · baja '+pe(overTotal)+' a Gustos y Necesidades':'';}
-  // Corazón — la tríada por sector: gastado de meta + lo que te queda (o te pasaste). Ahorro = apartado, no gastable.
+  // Corazón — cuánto llevas GASTADO por sector + total. Lo disponible vive abajo (el reparto), para no contradecir.
   (function(){
-    const fmt=(g,gastado,meta,eaten)=>{
-      const sp=document.getElementById('hspent-'+g),lf=document.getElementById('hleft-'+g);
-      if(sp)sp.innerHTML='<b>'+pe(gastado)+'</b> de '+pe(meta);
-      if(!lf)return;
-      const real=(meta-gastado)-eaten;
-      let txt=real<-0.5?'te pasaste '+pe(-real)+' ⚠':'te quedan '+pe(real);
-      if(eaten>0.5)txt+=' · tu ahorro tomó '+pe(eaten);
-      lf.className='hr-left '+(real<-0.5?'neg':'pos');
-      lf.textContent=txt;
+    const setAmt=(g,gastado,meta)=>{
+      const a=document.getElementById('hamt-'+g),o=document.getElementById('hover-'+g);
+      if(a)a.innerHTML='<b>'+pe(gastado)+'</b> de '+pe(meta);
+      if(o){const over=gastado-meta;
+        if(over>0.5){o.textContent='te pasaste '+pe(over)+' ⚠';o.style.display='';}
+        else{o.textContent='';o.style.display='none';}}
     };
-    fmt('nec',acts.nec||0,tgts.nec||0,eatenNec);
-    fmt('luj',acts.luj||0,tgts.luj||0,eatenLuj);
-    const sp=document.getElementById('hspent-aho');if(sp)sp.innerHTML='apartado <b>'+pe(acts.aho||0)+'</b> de tu meta '+pe(tgts.aho||0);
-    const lf=document.getElementById('hleft-aho');if(lf){lf.className='hr-left aho';lf.textContent='esto no se gasta';}
+    setAmt('nec',acts.nec||0,tgts.nec||0);
+    setAmt('luj',acts.luj||0,tgts.luj||0);
+    const aa=document.getElementById('hamt-aho');if(aa)aa.innerHTML='apartado <b>'+pe(acts.aho||0)+'</b> de '+pe(tgts.aho||0);
+    const tot=document.getElementById('hamt-total');if(tot)tot.innerHTML='<b>'+pe(gas)+'</b> de '+pe(ti);
   })();
   document.getElementById('b-gas').textContent=pe(gas);
   const saldo=ti-gas,sl=document.getElementById('b-sl');
