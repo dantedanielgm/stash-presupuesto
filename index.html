@@ -1384,8 +1384,12 @@ function toggleDebtPaid(name){
 function ejecutadoSum(){
   let e=0;
   ['nec','luj'].forEach(g=>{(d[g]||[]).forEach((r,i)=>{
-    if(hasSubs(r)){ r.sub.forEach((s,j)=>{ if(d.itemPaid&&d.itemPaid[g+'-'+i+'-'+j]&&!s.tj) e+=parseFloat(s.a)||0; }); }
-    else { if(d.itemPaid&&d.itemPaid[g+'-'+i]&&!r.tj) e+=parseFloat(r.a)||0; }
+    const padre=!!(d.itemPaid&&d.itemPaid[g+'-'+i]); // marcar el padre cuenta toda la categoría
+    if(hasSubs(r)){
+      if(!r.tj) r.sub.forEach((s,j)=>{ if((padre||(d.itemPaid&&d.itemPaid[g+'-'+i+'-'+j]))&&!s.tj) e+=parseFloat(s.a)||0; });
+    } else {
+      if(padre&&!r.tj) e+=parseFloat(r.a)||0;
+    }
   });});
   if(d.paid){ debts.filter(x=>!x.auto).forEach(x=>{ if(d.paid[x.n]) e+=(parseFloat(d.paidAmt&&d.paidAmt[x.n])||debtAmt(x,(d.debtPay&&d.debtPay[x.n])||'min')); }); }
   return e;
