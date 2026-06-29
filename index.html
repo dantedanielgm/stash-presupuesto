@@ -329,13 +329,18 @@ body.focuson .ov-bar{display:none}
 /* Corazón — "Libre para gastar" por sección (lo primero que ves al abrir) */
 .heart{background:var(--card); border:1px solid var(--line); border-radius:var(--rad); box-shadow:var(--shadow); padding:1.1rem 1.1rem 1.2rem; margin:.4rem 0 1.6rem}
 .heart-h{font-size:11.5px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:var(--tx2); text-align:center; margin-bottom:1rem}
-.heart-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:.5rem}
-.heart-c{text-align:center; display:flex; flex-direction:column; gap:.18rem; padding:0 .2rem}
-.hc-lbl{font-size:12px; color:var(--tx2); font-weight:500}
-.hc-val{font-size:23px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.02em; color:var(--ok); line-height:1.1}
-.hc-val.neg{color:var(--bad)}
-.hc-val.aho{color:var(--tx)}
-.hc-sub{font-size:10.5px; color:var(--tx3)}
+.heart-rows{display:flex; flex-direction:column}
+.hrow{padding:.7rem 0; border-bottom:1px solid var(--line)}
+.hrow:first-child{padding-top:0}
+.hrow:last-child{border-bottom:none; padding-bottom:0}
+.hr-top{display:flex; justify-content:space-between; align-items:baseline; gap:.5rem}
+.hr-lbl{font-size:13px; color:var(--tx2); font-weight:600}
+.hr-left{font-size:15.5px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.01em; text-align:right; white-space:nowrap}
+.hr-left.pos{color:var(--ok)}
+.hr-left.neg{color:var(--bad)}
+.hr-left.aho{color:var(--tx3); font-size:11.5px; font-weight:500; font-style:italic}
+.hr-spent{font-size:12px; color:var(--tx3); margin-top:.2rem}
+.hr-spent b{color:var(--tx2); font-weight:700; font-variant-numeric:tabular-nums}
 body.focuson #heart{display:none}
 /* Bienvenida — primer arranque: elegir ciclo antes de ver nada */
 .welcome{position:fixed; inset:0; z-index:100; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:1.5rem}
@@ -818,11 +823,11 @@ function render(){
       '</div>'+
     '</div>'+
     '<div class="heart" id="heart">'+
-      '<div class="heart-h">Libre para gastar esta quincena</div>'+
-      '<div class="heart-grid">'+
-        '<div class="heart-c"><span class="hc-lbl">Necesidades</span><b class="hc-val" id="heart-nec">&mdash;</b><span class="hc-sub">para gastar</span></div>'+
-        '<div class="heart-c"><span class="hc-lbl">Gustos</span><b class="hc-val" id="heart-luj">&mdash;</b><span class="hc-sub">para gastar</span></div>'+
-        '<div class="heart-c"><span class="hc-lbl">Ahorro</span><b class="hc-val aho" id="heart-aho">&mdash;</b><span class="hc-sub" id="heart-aho-sub"></span></div>'+
+      '<div class="heart-h">Te queda para gastar · este ciclo</div>'+
+      '<div class="heart-rows">'+
+        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Necesidades</span><span class="hr-left" id="hleft-nec">&mdash;</span></div><div class="hr-spent" id="hspent-nec"></div></div>'+
+        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Gustos</span><span class="hr-left" id="hleft-luj">&mdash;</span></div><div class="hr-spent" id="hspent-luj"></div></div>'+
+        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Ahorro</span><span class="hr-left aho" id="hleft-aho"></span></div><div class="hr-spent" id="hspent-aho"></div></div>'+
       '</div>'+
     '</div>'+
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
@@ -925,13 +930,22 @@ function recompute(){
     }});
   const ahoEl=document.getElementById('eaten-aho');
   if(ahoEl){ahoEl.className='eaten neutral';ahoEl.textContent=overTotal>0.5?' · baja '+pe(overTotal)+' a Gustos y Necesidades':'';}
-  // Corazón — "Libre para gastar" por sección. nec/luj = lo que te queda para gastar; ahorro = lo que apartas vs tu meta.
+  // Corazón — la tríada por sector: gastado de meta + lo que te queda (o te pasaste). Ahorro = apartado, no gastable.
   (function(){
-    const setHC=(id,v)=>{const e=document.getElementById(id);if(e){e.textContent=pe(v);e.classList.toggle('neg',v<-0.5);}};
-    setHC('heart-nec',(tgts.nec||0)-(acts.nec||0)-eatenNec);
-    setHC('heart-luj',(tgts.luj||0)-(acts.luj||0)-eatenLuj);
-    const ah=document.getElementById('heart-aho');if(ah)ah.textContent=pe(acts.aho||0);
-    const ahs=document.getElementById('heart-aho-sub');if(ahs)ahs.textContent='de tu meta '+pe(tgts.aho||0);
+    const fmt=(g,gastado,meta,eaten)=>{
+      const sp=document.getElementById('hspent-'+g),lf=document.getElementById('hleft-'+g);
+      if(sp)sp.innerHTML='<b>'+pe(gastado)+'</b> de '+pe(meta);
+      if(!lf)return;
+      const real=(meta-gastado)-eaten;
+      let txt=real<-0.5?'te pasaste '+pe(-real)+' ⚠':'te quedan '+pe(real);
+      if(eaten>0.5)txt+=' · tu ahorro tomó '+pe(eaten);
+      lf.className='hr-left '+(real<-0.5?'neg':'pos');
+      lf.textContent=txt;
+    };
+    fmt('nec',acts.nec||0,tgts.nec||0,eatenNec);
+    fmt('luj',acts.luj||0,tgts.luj||0,eatenLuj);
+    const sp=document.getElementById('hspent-aho');if(sp)sp.innerHTML='apartado <b>'+pe(acts.aho||0)+'</b> de tu meta '+pe(tgts.aho||0);
+    const lf=document.getElementById('hleft-aho');if(lf){lf.className='hr-left aho';lf.textContent='esto no se gasta';}
   })();
   document.getElementById('b-gas').textContent=pe(gas);
   const saldo=ti-gas,sl=document.getElementById('b-sl');
