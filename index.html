@@ -497,6 +497,14 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .iod-d{font-size:12px; color:var(--tx2); line-height:1.45}
 .io-mix{font-size:12px; color:var(--tx3); font-style:italic}
 .io-disc{font-size:11.5px; color:var(--tx3); line-height:1.5; border-top:1px solid var(--line); padding-top:.7rem}
+/* Gestos táctiles: jalar para refrescar + swipe entre ciclos */
+#ptr{position:fixed; top:-46px; left:50%; transform:translateX(-50%); width:38px; height:38px; border-radius:50%; background:var(--card); border:1px solid var(--line); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; opacity:0; z-index:300; pointer-events:none; transition:opacity .15s}
+#ptr .ptr-i{font-size:20px; color:var(--accent); line-height:1; transition:transform .2s}
+#ptr.ready .ptr-i{transform:rotate(180deg)}
+#ptr.go .ptr-i{animation:ptrspin .6s linear infinite}
+@keyframes ptrspin{to{transform:rotate(360deg)}}
+#cyc-toast{position:fixed; bottom:84px; left:50%; transform:translateX(-50%) translateY(10px); background:var(--tx); color:var(--card); font-size:13px; font-weight:700; padding:.5rem .95rem; border-radius:20px; opacity:0; z-index:300; pointer-events:none; transition:opacity .2s, transform .2s; box-shadow:var(--shadow)}
+#cyc-toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -1626,6 +1634,61 @@ const _isLocal = ['localhost','127.0.0.1',''].includes(location.hostname);
 if('serviceWorker' in navigator && location.protocol!=='file:' && !_isLocal){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
+
+/* ===== Gestos táctiles (celular): jalar-para-refrescar + swipe entre ciclos ===== */
+(function(){
+  if(!('ontouchstart' in window)) return; // solo en pantallas táctiles
+  // --- Jalar hacia abajo (en el tope) para recargar ---
+  const ptr=document.createElement('div'); ptr.id='ptr'; ptr.innerHTML='<span class="ptr-i">↻</span>';
+  document.body.appendChild(ptr);
+  let py=0, pulling=false, dist=0; const PT=70;
+  document.addEventListener('touchstart',e=>{
+    if(window.scrollY<=0 && e.touches.length===1){py=e.touches[0].clientY;pulling=true;dist=0;}
+    else pulling=false;
+  },{passive:true});
+  document.addEventListener('touchmove',e=>{
+    if(!pulling)return;
+    dist=e.touches[0].clientY-py;
+    if(dist>0){
+      if(e.cancelable)e.preventDefault(); // suprime el rebote y el pull nativo, gana el nuestro
+      const d=Math.min(dist,110);
+      ptr.style.transform='translateX(-50%) translateY('+d+'px)';
+      ptr.style.opacity=Math.min(dist/PT,1);
+      ptr.classList.toggle('ready',dist>PT);
+    } else { pulling=false; ptr.style.opacity=0; }
+  },{passive:false});
+  document.addEventListener('touchend',()=>{
+    if(!pulling)return; pulling=false;
+    if(dist>PT){ ptr.classList.add('go'); location.reload(); }
+    else { ptr.style.transform=''; ptr.style.opacity=0; ptr.classList.remove('ready'); }
+  });
+  // --- Swipe horizontal → ciclo siguiente (izquierda) / anterior (derecha) ---
+  let sx=0,sy=0,stime=0,track=false;
+  document.addEventListener('touchstart',e=>{
+    if(e.touches.length!==1){track=false;return;}
+    const t=e.touches[0];
+    if(t.clientX<24||t.clientX>window.innerWidth-24){track=false;return;} // borde = gesto "atrás" del navegador
+    sx=t.clientX;sy=t.clientY;stime=Date.now();track=true;
+  },{passive:true});
+  let toastT=null;
+  function cycleToast(label){
+    let el=document.getElementById('cyc-toast');
+    if(!el){el=document.createElement('div');el.id='cyc-toast';document.body.appendChild(el);}
+    el.textContent=label; el.classList.add('show');
+    clearTimeout(toastT); toastT=setTimeout(()=>el.classList.remove('show'),1100);
+  }
+  document.addEventListener('touchend',e=>{
+    if(!track)return; track=false;
+    const t=e.changedTouches[0], dx=t.clientX-sx, dy=t.clientY-sy;
+    if(Date.now()-stime<600 && Math.abs(dx)>80 && Math.abs(dx)>Math.abs(dy)*2){
+      if(typeof cycles==='undefined'||!cycles.length)return;
+      const idx=cycles.findIndex(c=>c.id===activeQ); let ni=idx;
+      if(dx<0 && idx<cycles.length-1) ni=idx+1;        // swipe izquierda → siguiente
+      else if(dx>0 && idx>0) ni=idx-1;                  // swipe derecha → anterior
+      if(ni!==idx){ switchCycle(cycles[ni].id); cycleToast(cycles[ni].label); }
+    }
+  },{passive:true});
+})();
 </script>
 </body>
 </html>
