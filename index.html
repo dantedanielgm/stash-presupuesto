@@ -1377,6 +1377,12 @@ function debtAmt(x,mode){
   if(mode==='mes')return parseFloat(x.mes)||parseFloat(x.min)||0;
   return parseFloat(x.min)||0;
 }
+// Etiqueta del monto: si el campo está en blanco (el banco aún no lo recalcula), muestra "s/d", no "S/ 0".
+function debtAmtLabel(x,mode){
+  const raw = mode==='total'?x.total : (mode==='mes'?x.mes : x.min);
+  if(raw===''||raw==null) return 's/d';
+  return pe(debtAmt(x,mode));
+}
 function debtPaySum(){if(!d.debtPay)return 0;return debts.filter(x=>!x.auto).reduce((t,x)=>{
   if(!d.debtPay[x.n])return t;
   if(d.paid&&d.paid[x.n]&&d.paidAmt&&d.paidAmt[x.n]!=null)return t+(parseFloat(d.paidAmt[x.n])||0); // ya pagada: usa el monto pagado (su mín quedó en blanco)
@@ -1432,7 +1438,7 @@ function ejecutadoSum(){
 function recommendedDebt(){const c=debts.filter(x=>!x.auto&&x.vence).sort((a,b)=>dateVal(a.vence)-dateVal(b.vence))[0];return c?c.n:null;}
 function modeToggleH(x){
   const m=(d.debtPay&&d.debtPay[x.n])||'min';
-  const opt=(mode,lbl)=>'<button class="dmode'+(m===mode?' on':'')+'" data-debtmode="'+esc(x.n)+'" data-m="'+mode+'">'+lbl+' '+pe(debtAmt(x,mode))+'</button>';
+  const opt=(mode,lbl)=>'<button class="dmode'+(m===mode?' on':'')+'" data-debtmode="'+esc(x.n)+'" data-m="'+mode+'">'+lbl+' '+debtAmtLabel(x,mode)+'</button>';
   return '<div class="dmodes">'+opt('min','Mín')+opt('mes','Mes')+opt('total','Total')+'</div>';
 }
 function debtPickerH(kind){
@@ -1441,7 +1447,7 @@ function debtPickerH(kind){
   const list=debts.filter(x=>!x.auto && (isCard?isCardDebt(x):isLoanDebt(x)) && !(d.debtPay&&d.debtPay[x.n]));
   let rows=list.map(x=>{
     const i=debts.indexOf(x);
-    const mb=(m,lbl)=>'<button class="pk-m" data-pickdebt="'+esc(x.n)+'" data-m="'+m+'">'+lbl+' '+pe(debtAmt(x,m))+'</button>';
+    const mb=(m,lbl)=>'<button class="pk-m" data-pickdebt="'+esc(x.n)+'" data-m="'+m+'">'+lbl+' '+debtAmtLabel(x,m)+'</button>';
     const star=(x.n===recommendedDebt())?' <span class="drec">⭐</span>':'';
     return '<div class="pkrow"><div class="pk-top"><span class="pk-n">'+esc(x.n)+star+'</span>'+
       '<span class="pk-act"><button class="pk-edit" data-editdebt="'+i+'" data-kind="'+kind+'" title="Editar">&#9998;</button>'+
