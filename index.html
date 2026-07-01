@@ -535,6 +535,17 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .dr-debe{font-size:11px; color:var(--tx2); margin-top:.55rem; padding-top:.45rem; border-top:1px dashed var(--line)}
 .dr-debe b{color:var(--tx); font-variant-numeric:tabular-nums}
 .dr-debe span{color:var(--tx3); font-size:10px}
+/* Onboarding: selector de periodo (mes / quincena / personalizado) + fecha de hoy */
+.wel-modes{display:flex; gap:.4rem; margin:.2rem 0 .8rem}
+.wel-mode{flex:1; font:inherit; font-size:12px; padding:.5rem .3rem; border:1px solid var(--line); border-radius:9px; background:var(--card); color:var(--tx2); cursor:pointer}
+.wel-mode.on{border-color:var(--accent); color:var(--accent); font-weight:600}
+.wel-pl{display:flex; flex-direction:column; font-size:11px; color:var(--tx3); gap:.2rem; margin-bottom:.6rem; text-align:left}
+.wel-pl input{font:inherit; font-size:15px; color:var(--tx); background:var(--card); border:1.5px solid var(--line); border-radius:var(--rad-sm); padding:.5rem}
+.wel-pl input:focus{outline:none; border-color:var(--accent)}
+.wel-half{display:flex; gap:.4rem}
+.wel-half button{flex:1; font:inherit; font-size:12px; padding:.45rem; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--tx2); cursor:pointer}
+.wel-half button.on{border-color:var(--accent); color:var(--accent); font-weight:600}
+.today{font-size:11px; color:var(--tx3); font-weight:500}
 </style>
 </head>
 <body>
@@ -542,23 +553,28 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
   <div class="wel-card">
     <div class="wel-logo">Stash</div>
     <div id="wel-step1">
-      <div class="wel-h">¿Cómo te pagan?</div>
-      <div class="wel-sub">Con eso organizamos tu dinero. Lo puedes cambiar después.</div>
-      <button class="wel-opt" data-cyc-type="q"><span class="wo-t">Por quincena</span><span class="wo-s">Me pagan dos veces al mes</span></button>
-      <button class="wel-opt" data-cyc-type="m"><span class="wo-t">Por mes</span><span class="wo-s">Me pagan una vez al mes</span></button>
+      <div class="wel-h">¿Cuánto vas a presupuestar este ciclo?</div>
+      <div class="wel-sub">Tu sueldo, o el monto que quieras repartir.</div>
+      <div class="wel-fondo">S/ <input id="wel-monto" type="number" min="0" step="1" placeholder="3700"></div>
+      <button class="wel-opt" data-welnext="1"><span class="wo-t">Continuar →</span></button>
     </div>
     <div id="wel-step2" hidden>
-      <div class="wel-h">¿Tienes algo ahorrado?</div>
-      <div class="wel-sub">Tu reserva / colchón. Si un mes te falta, sale de aquí — no se vuelve deuda. Déjalo en 0 si empiezas de cero.</div>
-      <div class="wel-fondo">S/ <input id="wel-fondo" type="number" min="0" step="1" placeholder="0"></div>
+      <div class="wel-h">¿Qué periodo cubre?</div>
+      <div class="wel-modes">
+        <button class="wel-mode on" data-welmode="m">Un mes</button>
+        <button class="wel-mode" data-welmode="q">Una quincena</button>
+        <button class="wel-mode" data-welmode="c">Personalizado</button>
+      </div>
+      <div id="wel-period"></div>
       <button class="wel-opt" data-finishonb="1"><span class="wo-t">Empezar →</span></button>
     </div>
     <div class="wel-foot">Stash reparte tu dinero con la regla <b>50/30/20</b> — el método de Elizabeth Warren (Harvard) para ahorrar primero y gastar tranquilo.</div>
   </div>
 </div>
 <div class="head">
+  <span class="today" id="today"></span>
   <h1>Stash</h1>
-  <span class="month-wrap">Mes: <input id="month" placeholder="Julio 2026"></span>
+  <span class="month-wrap" style="display:none">Mes: <input id="month" placeholder="Julio 2026"></span>
   <div class="q-tabs" id="cyclebar"></div>
   <button id="undo" hidden>&#8624; Deshacer</button>
 </div>
@@ -585,6 +601,22 @@ function saveCycles(){localStorage.setItem('midas_cycles',JSON.stringify(cycles)
 let activeQ = localStorage.getItem('midas_active_cycle') || cycles[0].id; // id del ciclo activo
 if(!cycles.find(c=>c.id===activeQ)) activeQ=cycles[0].id;
 const cycleOf=id=>cycles.find(c=>c.id===id)||cycles[0];
+// Fechas del ciclo: etiqueta (Julio · Quincena 1) y "cubre entre X y Y", derivadas de start/end.
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
+function fmtFecha(iso){if(!iso)return '';const p=iso.split('-');return (+p[2])+' '+MESES[(+p[1])-1].slice(0,3);}
+function fmtFechaLarga(iso){if(!iso)return '';const p=iso.split('-');return (+p[2])+' de '+MESES[(+p[1])-1];}
+function cycleLabel(c){
+  if(!c)return 'Ciclo';
+  if(!c.start)return c.label||'Ciclo';
+  const p=c.start.split('-'), m=+p[1], dd=+p[2];
+  if(c.type==='m')return cap(MESES[m-1]);
+  if(c.type==='q')return cap(MESES[m-1])+' · Quincena '+(dd<=15?'1':'2');
+  return fmtFecha(c.start)+' – '+fmtFecha(c.end);
+}
+function cycleCubre(c){if(!c||!c.start)return '';return 'cubre entre '+fmtFechaLarga(c.start)+' y '+fmtFechaLarga(c.end);}
+function isoToday(){const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
+function lastDay(y,m){return new Date(y,m,0).getDate();} // m 1-based
 function cyclePayday(id){const x=(id===activeQ&&typeof d!=='undefined')?d:load(id);return x&&x.payday||'';}
 function renderCycleBar(){
   const bar=document.getElementById('cyclebar');if(!bar)return;
@@ -855,6 +887,7 @@ function syncParents(){
 function render(){
   syncParents();
   document.getElementById('month').value=d.month||'';
+  {const _td=document.getElementById('today');if(_td)_td.textContent=fmtFechaLarga(isoToday())+' '+new Date().getFullYear();}
   // sincronizar botones de tab
   renderCycleBar();
   let incRows=d.inc.map((r,i)=>rowH('inc',i,r)).join('');
@@ -862,9 +895,9 @@ function render(){
     '<div class="sec" id="sec-inc" style="margin-top:.5rem">'+
       '<div class="hero-inc">'+
         '<div class="hi-num" id="hi-num">—</div>'+
-        '<div class="hi-sub">cubre <b id="hi-cycle"></b></div>'+
+        '<div class="hi-sub"><b id="hi-cycle"></b></div>'+
         '<div class="hi-phrase">"No ahorres lo que te queda después de gastar; gasta lo que te queda después de ahorrar." — Warren Buffett</div>'+
-        '<button class="hi-edit" data-incedit="1">'+(incEdit?'▲ cerrar':'✎ editar presupuesto')+'</button>'+
+        '<button class="hi-edit" data-incedit="1">'+(incEdit?'▲ cerrar':'✎ editar')+'</button>'+
       '</div>'+
       '<div class="hero-fondo">💰 Reserva: S/ <input id="fondo-inp" type="number" min="0" step="1" value="'+fondo+'"><span class="hf-hint"> — tu colchón</span></div>'+
       '<div id="inc-detail"'+(incEdit?'':' style="display:none"')+'>'+
@@ -940,7 +973,7 @@ function recompute(){
   const tot=ge('tot-inc');if(tot)tot.textContent=pe(ti);
   const binc=ge('b-inc');if(binc)binc.textContent=pe(ti);
   const hn=ge('hi-num');if(hn)hn.textContent=pe(ti);
-  const hc=ge('hi-cycle');if(hc)hc.textContent=cycleOf(activeQ).label+(d.payday?' · desde '+dueLabel(d.payday):(d.month?' · '+d.month:''));
+  const hc=ge('hi-cycle');if(hc){const cyc=cycleOf(activeQ);const cu=cycleCubre(cyc);hc.textContent=cycleLabel(cyc)+(cu?' · '+cu:'');}
   let gas=0;const acts={},tgts={};
   buckets.forEach(b=>{const g=b[0];let act=(g==='nec'||g==='luj')?sumCash(d[g]):sum(d[g]);
     if(g==='aho'){act+=debtPaySum();}
@@ -1702,21 +1735,45 @@ function isFirstRun(){
   return true;
 }
 function showWelcome(show){const w=document.getElementById('welcome');if(w)w.hidden=!show;document.body.classList.toggle('welcoming',show);}
-let pendingCycleType=null;
-function chooseCycle(type){ // paso 1: guarda el tipo y muestra el paso 2 (reserva)
-  pendingCycleType=type;
+let welMode='m', welHalf=1, welMonth='', welMonto=0;
+function welPeriodH(){
+  const mo='<label class="wel-pl">Mes<input type="month" id="wel-month" value="'+welMonth+'"></label>';
+  if(welMode==='m')return mo;
+  if(welMode==='q')return mo+'<div class="wel-half"><button data-welhalf="1" class="'+(welHalf===1?'on':'')+'">1ra · 1–15</button><button data-welhalf="2" class="'+(welHalf===2?'on':'')+'">2da · 16–fin</button></div>';
+  return '<label class="wel-pl">Desde<input type="date" id="wel-from"></label><label class="wel-pl">Hasta<input type="date" id="wel-to"></label>';
+}
+function renderWelPeriod(){const e=document.getElementById('wel-period');if(e)e.innerHTML=welPeriodH();
+  document.querySelectorAll('.wel-mode').forEach(b=>b.classList.toggle('on',b.dataset.welmode===welMode));}
+function welNext(){ // paso 1 (monto) -> paso 2 (periodo)
+  welMonto=parseFloat((document.getElementById('wel-monto')||{}).value)||0;
   const s1=document.getElementById('wel-step1'),s2=document.getElementById('wel-step2');
   if(s1)s1.hidden=true; if(s2)s2.hidden=false;
-  const fi=document.getElementById('wel-fondo');if(fi)fi.focus();
+  const t=new Date(); welMonth=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');
+  renderWelPeriod();
 }
 function finishOnboarding(){
-  const type=pendingCycleType||'q';
-  const fi=document.getElementById('wel-fondo'); fondo=parseFloat(fi&&fi.value)||0; saveFondo();
-  cycles=[{id:'c1',type:type,label:type==='m'?'Mes 1':'Quincena 1'}];saveCycles();
+  let start='', end='', type=welMode;
+  if(welMode==='m'||welMode==='q'){
+    const mv=(document.getElementById('wel-month')||{}).value||welMonth;
+    const pp=mv.split('-'), y=+pp[0], m=+pp[1];
+    if(welMode==='m'){ start=mv+'-01'; end=mv+'-'+String(lastDay(y,m)).padStart(2,'0'); }
+    else if(welHalf===1){ start=mv+'-01'; end=mv+'-15'; }
+    else { start=mv+'-16'; end=mv+'-'+String(lastDay(y,m)).padStart(2,'0'); }
+  } else {
+    start=(document.getElementById('wel-from')||{}).value||'';
+    end=(document.getElementById('wel-to')||{}).value||'';
+  }
+  cycles=[{id:'c1',type:type,start:start,end:end,label:'Ciclo 1'}];saveCycles();
   activeQ='c1';localStorage.setItem('midas_active_cycle',activeQ);localStorage.setItem('midas_onboarded','1');
-  d=def();save();showWelcome(false);view='inicio';incEdit=true;render();renderDebts();window.scrollTo({top:0});
+  d=def(); d.inc=[{l:'Presupuesto',a:welMonto}]; save();
+  showWelcome(false);view='inicio';incEdit=false;render();renderDebts();window.scrollTo({top:0});
 }
-document.getElementById('welcome').addEventListener('click',e=>{const b=e.target.closest('[data-cyc-type]');if(b){chooseCycle(b.dataset.cycType);return;}if(e.target.closest('[data-finishonb]'))finishOnboarding();});
+document.getElementById('welcome').addEventListener('click',e=>{
+  if(e.target.closest('[data-welnext]')){welNext();return;}
+  const md=e.target.closest('[data-welmode]'); if(md){welMode=md.dataset.welmode;renderWelPeriod();return;}
+  const hf=e.target.closest('[data-welhalf]'); if(hf){welHalf=+hf.dataset.welhalf;renderWelPeriod();return;}
+  if(e.target.closest('[data-finishonb]'))finishOnboarding();
+});
 
 if(isFirstRun()){showWelcome(true);}
 else{render();renderDebts();}
