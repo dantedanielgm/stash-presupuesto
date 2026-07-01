@@ -147,6 +147,11 @@ body.focuson .reset{display:none}
 .ln-red{font-size:12px; color:var(--bad); font-weight:600; line-height:1.45; margin-top:.35rem}
 .ln-mg{font-size:12px; color:var(--accent); font-weight:600; line-height:1.45; margin-top:.25rem; text-decoration:underline dotted; text-underline-offset:3px}
 .ln-mg.neg{color:var(--bad); text-decoration:none}
+.heart.macro-card{padding:.8rem 1rem; margin:.35rem 0 1rem}
+.macro{display:flex; justify-content:space-around; align-items:flex-start; gap:.4rem; text-align:center}
+.macro .mc{display:flex; flex-direction:column; gap:.2rem; flex:1; min-width:0}
+.macro .mc-l{font-size:10.5px; color:var(--tx3); font-weight:500; text-transform:uppercase; letter-spacing:.02em}
+.macro .mc-v{font-size:16px; font-weight:800; color:var(--tx); font-variant-numeric:tabular-nums; letter-spacing:-.01em}
 .rollbonus b{font-weight:700}
 .rb-pct{color:var(--tx3); font-size:11px}
 /* Selector de abono a deuda */
@@ -582,7 +587,7 @@ function renderCycleBar(){
     '<button class="q-tab addcyc" data-addcycle="q" title="Agregar quincena">+ Q</button>'+
     '<button class="q-tab addcyc" data-addcycle="m" title="Agregar mes">+ Mes</button>';
 }
-function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);showRollover=!!(d&&d.rollover&&d.rollover.saldo>0);
+function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);showRollover=true;
   // se mantiene la tab actual (Inicio/Resumen/Deudas/Invertir) al cambiar de ciclo — no resetear a Inicio
   localStorage.setItem('midas_active_cycle',activeQ);history=[];render();renderDebts();updateUndo();}
 function addCycle(type){
@@ -600,7 +605,7 @@ let tjOpen=null; // "g-i" de la línea con el selector de tarjeta abierto
 // Modo guiado por escenas: Ahorro → Gustos → Necesidades → Plan quincenal.
 const WIZ=['sec-aho','sec-luj','sec-nec','planbox'];
 let wizStep=0;
-let showRollover=false; // true = muestra el reparto 50/30/20 arriba de cada caja
+let showRollover=true; // por defecto ON: el reparto 50/30/20 (disponible por sector) se ve al abrir
 let lastSaldo=0; // último saldo libre calculado (para congelar el rollover)
 let abonoOpen=false; // true = panel de saldo libre muestra el selector de a qué deuda abonar
 let collapsed={aho:true,nec:true,luj:true,balance:true}; // al abrir: 3 cajas + balance colapsados
@@ -676,7 +681,7 @@ function load(q){
   return def();
 }
 let d=load(activeQ);
-showRollover=!!(d&&d.rollover&&d.rollover.saldo>0); // el rollover existe SOLO si hay montos guardados
+showRollover=true; // por defecto ON: el disponible por sector se ve al abrir
 function save(){localStorage.setItem(keyFor(activeQ),JSON.stringify(d));localStorage.setItem('midas_active_cycle',activeQ);}
 // Copia de seguridad: exportar TODA tu data a un archivo, e importarla (mover de dispositivo, restaurar).
 function exportData(){
@@ -855,16 +860,12 @@ function render(){
         '<div class="tot"><span class="lbl">Ingreso total proyectado</span><span class="val" id="tot-inc"></span></div>'+
       '</div>'+
     '</div>'+
-    '<div class="heart" id="heart">'+
-      '<div class="heart-h">Presupuestado · este ciclo</div>'+
-      '<div class="heart-note">Es tu plan del ciclo. Marca ✓ lo que ya pagaste y se vuelve real — las deudas bajan su saldo.</div>'+
-      '<div class="heart-rows">'+
-        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Necesidades</span><span class="hr-amt" id="hamt-nec">&mdash;</span></div><div class="hr-over" id="hover-nec" style="display:none"></div></div>'+
-        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Gustos</span><span class="hr-amt" id="hamt-luj">&mdash;</span></div><div class="hr-over" id="hover-luj" style="display:none"></div></div>'+
-        '<div class="hrow"><div class="hr-top"><span class="hr-lbl">Ahorro</span><span class="hr-amt" id="hamt-aho">&mdash;</span></div></div>'+
+    '<div class="heart macro-card" id="heart">'+
+      '<div class="macro">'+
+        '<div class="mc"><span class="mc-l">Presupuestado</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">Libre</span><span class="mc-v" id="mc-libre">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">Ya real</span><span class="mc-v" id="mc-real">&mdash;</span></div>'+
       '</div>'+
-      '<div class="heart-total"><span>Total presupuestado</span><span id="hamt-total">&mdash;</span></div>'+
-      '<div class="heart-exec" id="heart-exec"></div>'+
     '</div>'+
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
     '<div class="sec'+(collapsed.balance?' is-collapsed':'')+'" id="sec-balance">'+
@@ -957,21 +958,13 @@ function recompute(){
   });
   showLn('red-aho', overTotal>0.5?'excede '+pe(overTotal)+', se deduce primero de gustos y luego de necesidades':'', 'ln-red');
   showLn('mg-aho', '', 'ln-mg');
-  // Corazón — cuánto llevas GASTADO por sector + total. Lo disponible vive abajo (el reparto), para no contradecir.
+  // Macro compacto (arriba): lo presupuestado del ingreso, lo libre (sin asignar), y lo ya real (ejecutado).
   (function(){
-    const setAmt=(g,gastado,meta)=>{
-      const a=document.getElementById('hamt-'+g),o=document.getElementById('hover-'+g);
-      if(a)a.innerHTML='<b>'+pe(gastado)+'</b> de '+pe(meta);
-      if(o){const over=gastado-meta;
-        if(over>0.5){o.textContent='te pasaste '+pe(over)+' ⚠';o.style.display='';}
-        else{o.textContent='';o.style.display='none';}}
-    };
-    setAmt('nec',acts.nec||0,tgts.nec||0);
-    setAmt('luj',acts.luj||0,tgts.luj||0);
-    const aa=document.getElementById('hamt-aho');if(aa)aa.innerHTML='<b>'+pe(acts.aho||0)+'</b> de '+pe(tgts.aho||0);
-    const tot=document.getElementById('hamt-total');if(tot)tot.innerHTML='<b>'+pe(gas)+'</b> de '+pe(ti);
-    const ex=(typeof ejecutadoSum==='function')?ejecutadoSum():0; const exEl=document.getElementById('heart-exec');
-    if(exEl) exEl.innerHTML = ex>0.5 ? '<b class="he-ck">✓</b> Ya real: <b>'+pe(ex)+'</b> de '+pe(gas)+' presupuestado' : 'Marca ✓ lo que ya pagaste y aparece aquí como real.';
+    const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+    set('mc-pres', pe(gas));
+    const libre=ti-gas, le=document.getElementById('mc-libre');
+    if(le){le.textContent=pe(libre); le.style.color=libre<-0.5?'var(--bad)':'';}
+    const ex=(typeof ejecutadoSum==='function')?ejecutadoSum():0; set('mc-real', pe(ex));
   })();
   document.getElementById('b-gas').textContent=pe(gas);
   const saldo=ti-gas,sl=document.getElementById('b-sl');
