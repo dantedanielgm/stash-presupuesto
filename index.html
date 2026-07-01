@@ -147,11 +147,17 @@ body.focuson .reset{display:none}
 .ln-red{font-size:12px; color:var(--bad); font-weight:600; line-height:1.45; margin-top:.35rem}
 .ln-mg{font-size:12px; color:var(--accent); font-weight:600; line-height:1.45; margin-top:.25rem; text-decoration:underline dotted; text-underline-offset:3px}
 .ln-mg.neg{color:var(--bad); text-decoration:none}
-.heart.macro-card{padding:.8rem 1rem; margin:.35rem 0 1rem}
-.macro{display:flex; justify-content:space-around; align-items:flex-start; gap:.4rem; text-align:center}
-.macro .mc{display:flex; flex-direction:column; gap:.2rem; flex:1; min-width:0}
+.heart.macro-card{background:none; border:none; box-shadow:none; padding:0 0 .7rem; margin:.4rem 0 1.1rem; border-bottom:1px solid var(--line)}
+.macro{display:grid; grid-template-columns:1fr 1fr 1fr; gap:.4rem; text-align:center}
+.macro .mc{display:flex; flex-direction:column; gap:.2rem; min-width:0}
 .macro .mc-l{font-size:10.5px; color:var(--tx3); font-weight:500; text-transform:uppercase; letter-spacing:.02em}
 .macro .mc-v{font-size:16px; font-weight:800; color:var(--tx); font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+/* Tríada por sección: Presupuestado · Utilizado · Disponible (alineada con el macro) */
+.triad{display:grid; grid-template-columns:1fr 1fr 1fr; gap:.4rem; text-align:center; margin:.4rem 0 .6rem}
+.triad .tr{display:flex; flex-direction:column; gap:.12rem; min-width:0}
+.triad .tr i{font-size:9.5px; color:var(--tx3); font-weight:500; font-style:normal; text-transform:uppercase; letter-spacing:.02em}
+.triad .tr b{font-size:15px; font-weight:800; color:var(--tx); font-variant-numeric:tabular-nums}
+.macro .mc-v.tr-util,.triad .tr b.tr-util{color:#e0872b}
 .rollbonus b{font-weight:700}
 .rb-pct{color:var(--tx3); font-size:11px}
 /* Selector de abono a deuda */
@@ -823,7 +829,11 @@ function bucketH(g,name,pct,num){
   return '<div class="sec'+(col?' is-collapsed':'')+'" id="sec-'+g+'">'+
     '<div class="sec-h tappable" data-collapse="'+g+'" title="Plegar/desplegar"><span class="tw"><span class="num num-'+g+'">'+num+'</span><span class="t">'+name+'</span></span><span class="sec-r"><span class="pct">'+Math.round(pct*100)+'%</span><span class="chev">'+(col?'▸':'▾')+'</span></span></div>'+
     (g==='aho'&&!col?'<div class="sec-note">Págate primero — esto sale antes de gastar.</div>':'')+
-    '<div class="meta">Meta <b id="tg-'+g+'"></b> · Gastado <b id="sm-'+g+'"></b></div>'+
+    '<div class="triad">'+
+      '<span class="tr"><i>Presupuestado</i><b id="tg-'+g+'">&mdash;</b></span>'+
+      '<span class="tr"><i>Utilizado</i><b class="tr-util" id="sm-'+g+'">&mdash;</b></span>'+
+      '<span class="tr"><i>Disponible</i><b id="disp-'+g+'">&mdash;</b></span>'+
+    '</div>'+
     '<div class="bar"><div class="bar-fill" id="bar-'+g+'"></div></div>'+
     '<div class="sec-lines"'+(col?' style="display:none"':'')+'>'+
       '<div class="ln-red" id="red-'+g+'" style="display:none"></div>'+
@@ -853,8 +863,8 @@ function render(){
       '<div class="hero-inc">'+
         '<div class="hi-num" id="hi-num">—</div>'+
         '<div class="hi-sub">cubre <b id="hi-cycle"></b></div>'+
-        '<div class="hi-phrase">Págate primero — ahorra antes de gastar</div>'+
-        '<button class="hi-edit" data-incedit="1">'+(incEdit?'▲ cerrar':'✎ editar ingreso')+'</button>'+
+        '<div class="hi-phrase">"No ahorres lo que te queda después de gastar; gasta lo que te queda después de ahorrar." — Warren Buffett</div>'+
+        '<button class="hi-edit" data-incedit="1">'+(incEdit?'▲ cerrar':'✎ editar presupuesto')+'</button>'+
       '</div>'+
       '<div class="hero-fondo">💰 Reserva: S/ <input id="fondo-inp" type="number" min="0" step="1" value="'+fondo+'"><span class="hf-hint"> — tu colchón</span></div>'+
       '<div id="inc-detail"'+(incEdit?'':' style="display:none"')+'>'+
@@ -868,8 +878,8 @@ function render(){
     '<div class="heart macro-card" id="heart">'+
       '<div class="macro">'+
         '<div class="mc"><span class="mc-l">Presupuestado</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
-        '<div class="mc"><span class="mc-l">Libre</span><span class="mc-v" id="mc-libre">&mdash;</span></div>'+
-        '<div class="mc"><span class="mc-l">Ya real</span><span class="mc-v" id="mc-real">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">Utilizado</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span></div>'+
       '</div>'+
     '</div>'+
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
@@ -954,22 +964,23 @@ function recompute(){
   const eatenNec=Math.min(over,tgts.nec||0);
   const eatenOf={luj:eatenLuj,nec:eatenNec};
   const showLn=(id,txt,cls)=>{const e=document.getElementById(id);if(!e)return;e.textContent=txt||'';e.className=cls;e.style.display=txt?'':'none';};
+  // Disponible por sección (3ra columna de la tríada): verde si queda, rojo si negativo.
+  const setDisp=(g,v)=>{const e=document.getElementById('disp-'+g);if(e){e.textContent=pe(v);e.style.color=v<-0.5?'var(--bad)':(v>0.5?'var(--ok)':'var(--tx2)');}};
+  setDisp('aho', (tgts.aho||0)-(acts.aho||0)); // ahorro: negativo si el exceso cae en cascada
   ['luj','nec'].forEach(g=>{
     const eat=eatenOf[g]||0, neto=(tgts[g]||0)-(acts[g]||0)-eat;
-    showLn('red-'+g, eat>0.5?'− '+pe(eat)+' deducidos, heredados de ahorro':'', 'ln-red');
-    if(neto<-0.5) showLn('mg-'+g, 'te falta '+pe(-neto)+' (déficit)', 'ln-mg neg');
-    else if(neto>0.5 && !showRollover) showLn('mg-'+g, 'quedan '+pe(neto), 'ln-mg'); // con reparto ON, la línea verde ya muestra el disponible (una sola fuente de verdad)
-    else showLn('mg-'+g, '', 'ln-mg');
+    setDisp(g, neto);
+    showLn('red-'+g, '', 'ln-red'); // la columna Disponible reemplaza las líneas por-sección
+    showLn('mg-'+g, '', 'ln-mg');
   });
-  showLn('red-aho', overTotal>0.5?'excede '+pe(overTotal)+', se deduce primero de gustos y luego de necesidades':'', 'ln-red');
+  showLn('red-aho', overTotal>0.5?'− '+pe(overTotal)+' se deduce primero de gustos, luego de necesidades':'', 'ln-red');
   showLn('mg-aho', '', 'ln-mg');
-  // Macro compacto (arriba): lo presupuestado del ingreso, lo libre (sin asignar), y lo ya real (ejecutado).
+  // Macro (arriba): Presupuestado (tu presupuesto total) / Utilizado (lo asignado, naranja) / Disponible (lo que queda).
   (function(){
-    const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
-    set('mc-pres', pe(gas));
-    const libre=ti-gas, le=document.getElementById('mc-libre');
-    if(le){le.textContent=pe(libre); le.style.color=libre<-0.5?'var(--bad)':'';}
-    const ex=(typeof ejecutadoSum==='function')?ejecutadoSum():0; set('mc-real', pe(ex));
+    const p=document.getElementById('mc-pres'); if(p)p.textContent=pe(ti);
+    const u=document.getElementById('mc-util'); if(u)u.textContent=pe(gas);
+    const disp=ti-gas, de=document.getElementById('mc-disp');
+    if(de){de.textContent=pe(disp); de.style.color=disp<-0.5?'var(--bad)':'var(--ok)';}
   })();
   document.getElementById('b-gas').textContent=pe(gas);
   const saldo=ti-gas,sl=document.getElementById('b-sl');
