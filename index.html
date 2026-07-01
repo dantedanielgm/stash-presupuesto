@@ -585,6 +585,18 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 #cyclebar{flex-direction:column; align-items:center; gap:.4rem}
 .cyc-main{display:flex; align-items:center; justify-content:center; gap:.5rem}
 .cyc-addrow{display:flex; gap:.4rem; justify-content:center}
+.cyc-edit{font:inherit; font-size:12px; line-height:1; width:24px; height:24px; border:1px solid var(--line); border-radius:7px; background:var(--card); color:var(--tx3); cursor:pointer; transition:.15s; margin-left:.15rem}
+.cyc-edit:hover,.cyc-edit.on{border-color:var(--accent); color:var(--accent)}
+.cyc-editor{width:100%; max-width:340px; margin:.2rem auto 0; background:var(--card); border:1px solid var(--line); border-radius:var(--rad-sm); box-shadow:var(--shadow); padding:.8rem .9rem}
+.ce-modes{display:flex; gap:.4rem; margin-bottom:.7rem}
+.ce-mode{flex:1; font:inherit; font-size:12px; padding:.45rem .3rem; border:1px solid var(--line); border-radius:8px; background:transparent; color:var(--tx2); cursor:pointer; transition:.15s}
+.ce-mode.on{border-color:var(--accent); color:var(--accent); font-weight:600}
+.ce-dates{display:flex; gap:.5rem; margin-bottom:.7rem}
+.ce-l{flex:1; display:flex; flex-direction:column; gap:.2rem; font-size:11px; color:var(--tx3)}
+.ce-l input{font:inherit; font-size:13px; color:var(--tx); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:.45rem .4rem}
+.ce-l input:focus{outline:none; border-color:var(--accent)}
+.ce-done{display:block; width:100%; font:inherit; font-size:13px; font-weight:600; color:#fff; background:var(--accent); border:none; border-radius:8px; padding:.55rem; cursor:pointer}
+.ce-done:hover{filter:brightness(1.08)}
 #themebtn{position:absolute; top:0; right:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:transparent; cursor:pointer; font-size:15px; line-height:1; transition:.15s}
 #themebtn:hover{border-color:var(--accent)}
 #undo{right:42px}
@@ -677,21 +689,28 @@ function saveCycles(){localStorage.setItem('midas_cycles',JSON.stringify(cycles)
 // el label caía al texto plano "Quincena 1". Les asigna fechas del mes actual (1ra/2da quincena
 // por su orden en el arreglo) para que el label nuevo ("Quincena Julio · 1/2") funcione ya mismo,
 // sin esperar a que el usuario cree un ciclo nuevo. Solo cosmético: no toca payday ni el plan de deudas.
+const CYCLEDATE_V=2;
 function migrateCycleDates(){
-  // Generalizado: CUALQUIER cantidad de quincenas/meses legacy sin fecha (no solo las 2 primeras),
-  // encadenadas en orden — cada 2 quincenas avanza un mes (idx 0,1=mes actual · 2,3=mes siguiente…).
-  const qs=cycles.filter(c=>c.type==='q'&&!c.start);
-  const ms=cycles.filter(c=>c.type==='m'&&!c.start);
+  // Rellena start/end de ciclos legacy ENCADENANDO desde el último ciclo que ya tiene fecha
+  // (arranca el día siguiente a su fin, no reinicia en el mes actual — ese era el bug julio/agosto).
+  // v<2: además re-encadena los ciclos ya auto-datados (antes de v2 no existía editor manual,
+  // así que TODAS las fechas eran automáticas → seguro recalcularlas para corregir el bug ya guardado).
+  const stored=parseInt(localStorage.getItem('midas_cycledates_v')||'0',10);
+  const reChain=stored<CYCLEDATE_V;
   let changed=false;
   const t=new Date(), y0=t.getFullYear(), m0=t.getMonth()+1;
-  const addM=(mm)=>{let yy=y0,mo=m0+mm;while(mo>12){mo-=12;yy++;}return {yy,mo};};
-  qs.forEach((c,i)=>{
-    const {yy,mo}=addM(Math.floor(i/2));
-    if(i%2===0){c.start=yy+'-'+pad2(mo)+'-01';c.end=yy+'-'+pad2(mo)+'-15';}
-    else{c.start=yy+'-'+pad2(mo)+'-16';c.end=yy+'-'+pad2(mo)+'-'+pad2(lastDay(yy,mo));}
-    changed=true;
+  let cursorEnd=null; // fin ISO del último ciclo procesado con fecha → ancla del siguiente
+  cycles.forEach(c=>{
+    if(c.type==='c'){ if(c.end)cursorEnd=c.end; return; } // periodo libre: no le inventamos rango
+    if(c.start && !reChain){ if(c.end)cursorEnd=c.end; return; } // ya tiene fecha y no toca re-encadenar
+    let sy,sm,sd;
+    if(cursorEnd){const dt=new Date(cursorEnd+'T00:00:00');dt.setDate(dt.getDate()+1);sy=dt.getFullYear();sm=dt.getMonth()+1;sd=dt.getDate();}
+    else {sy=y0;sm=m0;sd=1;}
+    if(c.type==='m'){c.start=sy+'-'+pad2(sm)+'-01';c.end=sy+'-'+pad2(sm)+'-'+pad2(lastDay(sy,sm));}
+    else{ if(sd<=15){c.start=sy+'-'+pad2(sm)+'-01';c.end=sy+'-'+pad2(sm)+'-15';} else {c.start=sy+'-'+pad2(sm)+'-16';c.end=sy+'-'+pad2(sm)+'-'+pad2(lastDay(sy,sm));} }
+    cursorEnd=c.end; changed=true;
   });
-  ms.forEach((c,i)=>{const {yy,mo}=addM(i);c.start=yy+'-'+pad2(mo)+'-01';c.end=yy+'-'+pad2(mo)+'-'+pad2(lastDay(yy,mo));changed=true;});
+  if(reChain)localStorage.setItem('midas_cycledates_v',String(CYCLEDATE_V));
   if(changed)saveCycles();
 }
 migrateCycleDates();
@@ -725,6 +744,7 @@ function lastDay(y,m){return new Date(y,m,0).getDate();} // m 1-based
 function pad2(n){return String(n).padStart(2,'0');}
 function isoOf(dt){return dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());}
 function cyclePayday(id){const x=(id===activeQ&&typeof d!=='undefined')?d:load(id);return x&&x.payday||'';}
+let cycEdit=false; // true = editor de fechas del ciclo abierto bajo la barra
 function renderCycleBar(){
   const bar=document.getElementById('cyclebar');if(!bar)return;
   const idx=cycles.findIndex(c=>c.id===activeQ), cyc=cycleOf(activeQ);
@@ -736,12 +756,26 @@ function renderCycleBar(){
       '<button class="cyc-nav" data-cycnav="-1"'+(idx<=0?' disabled':'')+'>‹</button>'+
       '<span class="cyc-cur">'+esc(cycleLabel(cyc))+'</span>'+
       '<button class="cyc-nav" data-cycnav="1"'+(idx>=cycles.length-1?' disabled':'')+'>›</button>'+
+      '<button class="cyc-edit'+(cycEdit?' on':'')+'" data-cycedit="1" title="Editar fechas de este ciclo">✎</button>'+
     '</div>'+
     '<div class="cyc-addrow">'+
       '<button class="cyc-add" data-addcycle="q" title="Agregar quincena">+Q</button>'+
       '<button class="cyc-add" data-addcycle="m" title="Agregar mes">+M</button>'+
       '<button class="cyc-add" data-addcycle="c" title="Agregar periodo personalizado">+P</button>'+
-    '</div>';
+    '</div>'+
+    (cycEdit?cycEditH(cyc):'');
+}
+// Editor manual de fechas del ciclo activo: tipo (Quincena/Mes/Periodo) + Desde/Hasta.
+function cycEditH(c){
+  const tp=(t,l)=>'<button class="ce-mode'+(c.type===t?' on':'')+'" data-cyctype="'+t+'">'+l+'</button>';
+  return '<div class="cyc-editor">'+
+    '<div class="ce-modes">'+tp('q','Quincena')+tp('m','Mes')+tp('c','Periodo')+'</div>'+
+    '<div class="ce-dates">'+
+      '<label class="ce-l">Desde<input type="date" data-cycdate="start" value="'+(c.start||'')+'"></label>'+
+      '<label class="ce-l">Hasta<input type="date" data-cycdate="end" value="'+(c.end||'')+'"></label>'+
+    '</div>'+
+    '<button class="ce-done" data-cyceditdone="1">Listo</button>'+
+  '</div>';
 }
 function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);showRollover=true;
   // se mantiene la tab actual (Inicio/Resumen/Deudas/Invertir) al cambiar de ciclo — no resetear a Inicio
@@ -1263,9 +1297,19 @@ function assignPanelH(saldo,abOpen){
 
 // Cambiar / agregar ciclo (barra dinámica, delegado)
 document.getElementById('cyclebar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.addcycle){addCycle(b.dataset.addcycle);}
+  if(b.dataset.addcycle){cycEdit=false;addCycle(b.dataset.addcycle);}
   else if(b.dataset.cyc){switchCycle(b.dataset.cyc);}
   else if(b.dataset.cycnav!==undefined){const i=cycles.findIndex(c=>c.id===activeQ)+(+b.dataset.cycnav);if(i>=0&&i<cycles.length)switchCycle(cycles[i].id);}
+  else if(b.dataset.cycedit){cycEdit=!cycEdit;renderCycleBar();}
+  else if(b.dataset.cyctype){const c=cycleOf(activeQ);c.type=b.dataset.cyctype;saveCycles();renderCycleBar();recompute();}
+  else if(b.dataset.cyceditdone){cycEdit=false;renderCycleBar();recompute();}
+});
+// Editar fechas del ciclo en vivo (no re-render completo para no perder foco del input de fecha).
+document.getElementById('cyclebar').addEventListener('input',e=>{const t=e.target;
+  if(!t.dataset||!t.dataset.cycdate)return;
+  const c=cycleOf(activeQ);c[t.dataset.cycdate]=t.value;saveCycles();
+  const cur=document.querySelector('.cyc-cur');if(cur)cur.textContent=cycleLabel(c);
+  recompute(); // refresca el subtítulo del hero (#hi-cycle) sin reconstruir la barra
 });
 
 const app=document.getElementById('app');
