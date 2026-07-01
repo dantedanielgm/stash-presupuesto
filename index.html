@@ -613,9 +613,16 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .mc-tap:hover{background:var(--line2)}
 .mc-hint{font-size:9px; color:var(--accent); border:1px solid var(--accent); border-radius:10px; padding:0 .35rem; margin:.2rem auto 0; width:max-content}
 .tr-tap{cursor:pointer}
-/* Checks más visibles: borde marcado, y el de "ya pagué" en verde aunque esté vacío */
+/* Checks más visibles: borde marcado. El check "ya pagué" toma el COLOR DE SU CAJA (azul en
+   Necesidades, ámbar en Gustos, verde en Ahorro) — así se siente distinto del presupuesto y
+   queda coherente con la columna "Pagado" de esa caja. */
 .pcheck{border-color:var(--tx3)}
 .pchk-paid:not(.on){border-color:var(--ok)}
+.pchk-paid.on{background:var(--ok); border-color:var(--ok)}
+#sec-nec .pchk-paid:not(.on){border-color:var(--accent)}
+#sec-nec .pchk-paid.on{background:var(--accent); border-color:var(--accent)}
+#sec-luj .pchk-paid:not(.on){border-color:#e0922f}
+#sec-luj .pchk-paid.on{background:#e0922f; border-color:#e0922f}
 /* En celular las 4 etiquetas caben sin recortarse */
 @media(max-width:420px){.macro .mc-l,.triad .tr i{font-size:8.5px; letter-spacing:0}}
 </style>
@@ -1001,8 +1008,8 @@ function subRowH(g,i,j,s){const canTj=(g==='nec'||g==='luj');
   '<input class="l" data-grp="'+g+'" data-idx="'+i+'" data-sub="'+j+'" data-f="l" value="'+esc(s.l)+'" placeholder="Subcategoría">'+
   '<input class="a" type="number" min="0" step="1" data-grp="'+g+'" data-idx="'+i+'" data-sub="'+j+'" data-f="a" value="'+s.a+'" placeholder="0">'+
   (canTj?'<button class="tjt'+(s.tj?' on':'')+'" data-tjt="1" data-grp="'+g+'" data-idx="'+i+'" data-sub="'+j+'" title="'+(s.tj?'En tarjeta: '+esc(s.tjCard||''):'Pagar con tarjeta')+'">'+TJ_SVG+'</button>':'')+
-  (canTj?'<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'-'+j+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button>':'')+
-  '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" data-sub="'+j+'" aria-label="Eliminar">&times;</button></div>';
+  '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" data-sub="'+j+'" aria-label="Eliminar">&times;</button>'+
+  (canTj?'<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'-'+j+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button>':'')+'</div>';
   if(canTj && tjOpen===(g+'-'+i+'-'+j)) h+=tjPickerH(g,i,j,s);
   return h;}
 
@@ -1044,8 +1051,8 @@ function rowH(g,i,r){
     '<input class="l" data-grp="'+g+'" data-idx="'+i+'" data-f="l" value="'+esc(r.l)+'" placeholder="Categoría">'+
     '<input class="a" type="number" min="0" step="1" data-grp="'+g+'" data-idx="'+i+'" data-f="a" value="'+amt+'" placeholder="0"'+(sub?' readonly':'')+'>'+
     (canTj?'<button class="tjt'+(r.tj?' on':'')+'" data-tjt="1" data-grp="'+g+'" data-idx="'+i+'" title="'+(r.tj?'En tarjeta: '+esc(r.tjCard||''):'Pagar con tarjeta')+'">'+TJ_SVG+'</button>':'')+
-    (canTj?'<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button>':'')+
-    '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" aria-label="Eliminar">&times;</button></div>';
+    '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" aria-label="Eliminar">&times;</button>'+
+    (canTj?'<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button>':'')+'</div>';
   if(canTj && tjOpen===(g+'-'+i)) h+=tjPickerH(g,i,null,r);
   if(g!=='inc'){
     h+='<div class="subwrap">';
