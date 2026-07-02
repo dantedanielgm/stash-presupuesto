@@ -174,7 +174,6 @@ body.focuson .reset{display:none}
 .ap-deb{font-size:11px; color:var(--tx3)}
 .ap-btn:hover .ap-deb{color:#fff}
 .ap-empty{font-size:12.5px; color:var(--tx2)}
-.assign-btns button.active{outline:2px solid var(--accent)}
 /* Botón de cuotas futuras */
 .cuotas-toggle{display:block; width:100%; margin-top:.6rem; padding:.6rem; border:1px solid var(--line); background:transparent; color:var(--tx2); font:inherit; font-size:12.5px; border-radius:var(--rad-sm); cursor:pointer; transition:.15s}
 .cuotas-toggle:hover{border-color:var(--accent); color:var(--accent)}
@@ -288,11 +287,11 @@ body.focuson .ov-bar{display:none}
 #assign-amt{font:inherit; font-weight:600; font-variant-numeric:tabular-nums; width:120px; text-align:right;
   background:var(--card); border:1px solid var(--line); border-radius:var(--rad-sm); padding:.5rem .6rem; color:var(--tx)}
 #assign-amt:focus{outline:none; border-color:var(--accent)}
-.assign-btns{display:flex; flex-direction:column; gap:.4rem}
-.assign-btns button{font:inherit; font-size:13px; font-weight:500; cursor:pointer; text-align:left;
-  border:1.5px solid var(--line); background:var(--card); color:var(--tx); border-radius:var(--rad-sm); padding:.6rem .9rem; transition:.15s}
-.assign-btns button:hover{border-color:var(--ok); color:var(--ok)}
-.assign-btns button .n{font-size:11.5px; color:var(--tx3); font-weight:400; margin-left:.35rem}
+/* Burbujas de destino: mismo estilo que el chip "50/30/20" del macro — compactas, azules, las 3 iguales */
+.assign-bubbles{display:flex; gap:.5rem; margin-bottom:.9rem; flex-wrap:wrap}
+.ab-bub{font:inherit; font-size:13px; font-weight:600; color:var(--accent); background:transparent;
+  border:1px solid var(--accent); border-radius:14px; padding:.4rem .9rem; cursor:pointer; transition:.15s}
+.ab-bub:hover,.ab-bub.active{background:var(--accent); color:#fff}
 .assign-note{font-size:12px; color:var(--tx2); margin-top:.9rem; line-height:1.5}
 
 /* Módulo Deudas y tarjetas */
@@ -822,6 +821,11 @@ let showRollover=true; // por defecto ON: el reparto 50/30/20 (disponible por se
 let lastSaldo=0; // último saldo libre calculado (para congelar el rollover)
 let abonoOpen=false; // true = panel de saldo libre muestra el selector de a qué deuda abonar
 let macroAssignOpen=false; // true = el panel "dale un destino" está abierto bajo el macro (se abre tocando el Disponible)
+// Chip "Repartido": rota entre 3 destinos con cada toque (en vez de arrastrar — evita chocar con
+// los gestos táctiles ya existentes de pull-to-refresh y swipe entre quincenas).
+let destinoSel='reparto'; // 'reparto' | 'deuda' | 'reserva' — cuál se ve en el chip ahora mismo
+const DESTINO_ORDEN=['reparto','deuda','reserva'];
+const DESTINO_LBL={reparto:'50/30/20',deuda:'Deuda',reserva:'Reserva'};
 let collapsed={aho:true,nec:true,luj:true,balance:true}; // al abrir: 3 cajas + balance colapsados
 let incEdit=false; // editar/agregar ingreso (oculto por defecto; el ingreso se ve grande arriba)
 let view='inicio'; // tab activo: inicio (las 3 cajas) | plan | deudas | informe
@@ -1125,8 +1129,8 @@ function render(){
       '<div class="macro">'+
         '<div class="mc"><span class="mc-l">Presup.</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
         '<div class="mc"><span class="mc-l">Utilizado</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
-        '<div class="mc mc-tap" data-macrodisp="1" title="Dale un destino a lo disponible"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span><span class="mc-hint">↻ 50/30/20</span></div>'+
-        '<div class="mc"><span class="mc-l">Repartido</span><span class="mc-v" style="color:var(--tx3)">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span></div>'+
+        '<div class="mc mc-tap" data-macrodisp="1" title="Toca para elegir destino — cada toque rota entre las 3 opciones"><span class="mc-l">Repartido</span><span class="mc-v" style="color:var(--tx3)">&mdash;</span><span class="mc-hint" data-destinocycle="1">50/30/20</span></div>'+
         '<div class="mc"><span class="mc-l">✓ Pagado</span><span class="mc-v" id="mc-done">&mdash;</span></div>'+
       '</div>'+
       '<div id="macro-assign"></div>'+
@@ -1262,11 +1266,12 @@ function recompute(){
     const amt=showRollover?Math.max(saldo,0)*_ro[g]:0;
     const rp=document.getElementById('repto-'+g); if(rp)rp.textContent=amt>0.5?'+'+pn(amt):'—';
   });
-  // Panel "dale un destino" — vive bajo el macro, se abre tocando el Disponible de arriba.
+  const dbub=document.querySelector('[data-destinocycle]'); if(dbub)dbub.textContent=DESTINO_LBL[destinoSel];
+  // Panel "dale un destino" — vive bajo el macro, se abre tocando "Repartido" de arriba.
   const ma=document.getElementById('macro-assign');
   if(ma) ma.innerHTML = macroAssignOpen
     ? (saldo>0.5 ? assignPanelH(saldo,abonoOpen)
-       : '<div class="assign"><div class="assign-h">Sin saldo libre por ahora.</div><div class="assign-sub">Cuando quede disponible, aquí le das destino: repartir, fondo o abono.</div></div>')
+       : '<div class="assign"><div class="assign-h">Sin saldo libre por ahora.</div><div class="assign-sub">Cuando quede disponible, aquí le das destino: repartir, reserva o abono.</div></div>')
     : '';
   refreshPlan();
   if(typeof refreshAutoDebts==='function')refreshAutoDebts();
@@ -1293,10 +1298,10 @@ function assignPanelH(saldo,abOpen){
     '<div class="assign-sub">Dale un destino — claro: tanto para esto, tanto para lo otro.</div>'+
     '<div class="assign-amt-wrap"><label>Monto a asignar</label>'+
       '<input id="assign-amt" type="number" min="0" step="1" value="'+v+'"></div>'+
-    '<div class="assign-btns">'+
-      '<button data-rollover="1" class="'+(showRollover?'active':'')+'">↻ '+(showRollover?'Quitar el reparto':'Repartir')+'<span class="n">'+(showRollover?'ocultar el reparto en las cajas':'reparte 50/30/20 en las 3 cajas')+'</span></button>'+
-      '<button data-assign="emer">🔒 Fondo<span class="n">apártalo como ahorro (fondo de emergencia)</span></button>'+
-      '<button data-abono="1" class="'+(abOpen?'active':'')+'">💳 Abono<span class="n">pagar deuda</span></button>'+
+    '<div class="assign-bubbles">'+
+      '<button class="ab-bub'+(showRollover?' active':'')+'" data-rollover="1" title="'+(showRollover?'Quitar el reparto':'Reparte 50/30/20 en las 3 cajas')+'">50/30/20</button>'+
+      '<button class="ab-bub'+(abOpen?' active':'')+'" data-abono="1" title="Abonar a una deuda">Deuda</button>'+
+      '<button class="ab-bub" data-assign="emer" title="Guardar en tu Reserva">Reserva</button>'+
     '</div>';
   if(abOpen){
     const cards=debts.filter(x=>!x.auto&&(parseFloat(x.total)||0)>0);
@@ -1356,7 +1361,13 @@ app.addEventListener('input',e=>{const t=e.target;
 app.addEventListener('click',e=>{
   const hdr=e.target.closest('.sec-h[data-collapse]'); // header acordeón: todo el encabezado pliega
   if(hdr){collapsed[hdr.dataset.collapse]=!collapsed[hdr.dataset.collapse];render();return;}
-  const md=e.target.closest('[data-macrodisp]'); // tocar el Disponible del macro abre/cierra "dale un destino"
+  const db=e.target.closest('[data-destinocycle]'); // el chip "50/30/20 · Deuda · Reserva": cada toque rota
+  if(db){
+    destinoSel=DESTINO_ORDEN[(DESTINO_ORDEN.indexOf(destinoSel)+1)%DESTINO_ORDEN.length];
+    macroAssignOpen=true; abonoOpen=(destinoSel==='deuda');
+    recompute(); return;
+  }
+  const md=e.target.closest('[data-macrodisp]'); // tocar "Repartido" abre/cierra "dale un destino"
   if(md){macroAssignOpen=!macroAssignOpen;abonoOpen=false;recompute();return;}
   const oc=e.target.closest('[data-openchecks]'); // tocar "✓ Pagado" abre la caja para ver los checks
   if(oc){const g=oc.dataset.openchecks;collapsed[g]=false;render();
@@ -1381,7 +1392,7 @@ app.addEventListener('click',e=>{
     const amt=Math.round(parseFloat(amtEl&&amtEl.value)||0);
     if(amt<=0)return;
     snapshot();
-    const map={emer:['aho','Fondo de emergencia'],inv:['aho','Inversión (largo plazo)'],lujo:['luj','Lujo consciente']};
+    const map={emer:['aho','Reserva'],inv:['aho','Inversión (largo plazo)'],lujo:['luj','Lujo consciente']};
     const [g,label]=map[b.dataset.assign];
     let cat=d[g].find(r=>r.l===label);
     if(cat){
