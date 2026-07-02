@@ -1246,7 +1246,12 @@ function recompute(){
   const utilNec=(acts.nec||0)+overLuj, dispNec=(tgts.nec||0)-utilNec;
   {const sm=document.getElementById('sm-nec'); if(sm)sm.textContent=pn(utilNec);}
   setDisp('nec', dispNec);
-  showLn('red-nec', overLuj>0.5?'− '+pe(overLuj)+' se arrastra de excedente de gustos':'', 'ln-red');
+  // Necesidades es la ÚLTIMA parada de la cadena (Ahorro → Gustos → Necesidades): si SE PASA POR SÍ
+  // SOLA (sin nada arrastrado de gustos), ese número YA es el final — no hay a dónde más mandarlo.
+  // Mandarlo "de vuelta" a Gustos duplicaría el déficit (rebotaría otra vez a Necesidades). Solo se
+  // aclara con una líneita propia para que no parezca un arrastre huérfano.
+  showLn('red-nec', overLuj>0.5?'− '+pe(overLuj)+' se arrastra de excedente de gustos'
+    : (dispNec<-0.5?'− '+pe(-dispNec)+' te pasaste de tu propia meta (no se arrastra a otra caja)':''), 'ln-red');
   showLn('mg-nec', '', 'ln-mg');
   showLn('red-aho', overAho>0.5?'− '+pe(overAho)+' se arrastra a gustos (y lo que sobre, a necesidades)':'', 'ln-red');
   showLn('mg-aho', '', 'ln-mg');
