@@ -609,6 +609,13 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .mc-rollchip .mrc-r{font-size:8.5px; font-weight:700; white-space:nowrap}
 .mc-rollchip.on{background:var(--ok); border-color:var(--ok); color:#fff}
 .mc-roll{justify-content:center}
+/* Barra de liquidez (bajo el macro): azul = ya pagado, morado = falta soltar. En plata, no en %. */
+.paybar{height:9px; border-radius:6px; overflow:hidden; display:flex; background:var(--line2); margin-top:.65rem}
+.pb-paid{height:100%; background:var(--accent); transition:width .35s cubic-bezier(.4,0,.2,1)}
+.pb-rest{height:100%; background:#9b6cf7; transition:width .35s cubic-bezier(.4,0,.2,1)}
+.paybar-l{display:flex; justify-content:space-between; gap:.5rem; margin-top:.3rem; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums}
+.pbl-paid{color:var(--accent)}
+.pbl-rest{color:#9b6cf7; text-align:right}
 .tr-tap{cursor:pointer}
 /* Checks más visibles: borde marcado. El check "ya pagué" es SIEMPRE azul (accent), en
    cualquier caja — un solo color para "esto es real/ejecutado", distinto del verde/ámbar
@@ -1143,6 +1150,10 @@ function render(){
         '</div>'+
         '<div class="mc"><span class="mc-l">&#10003; Pagado</span><span class="mc-v" id="mc-done">&mdash;</span></div>'+
       '</div>'+
+      // Barra de liquidez: cuánto de lo comprometido YA soltaste (azul) y cuánto te FALTA soltar
+      // (morado) — en plata, no en %. Responde "¿cuánto de mi cuenta no puedo tocar?".
+      '<div class="paybar" id="paybar" style="display:none"><div class="pb-paid" id="pb-paid"></div><div class="pb-rest" id="pb-rest"></div></div>'+
+      '<div class="paybar-l" id="paybar-l" style="display:none"><span class="pbl-paid" id="pbl-paid"></span><span class="pbl-rest" id="pbl-rest"></span></div>'+
     '</div>'+
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
     '<div class="sec'+(collapsed.balance?' is-collapsed':'')+'" id="sec-balance">'+
@@ -1254,7 +1265,20 @@ function recompute(){
       el.textContent=pct==null?'—':pct+'%';
       el.style.color=(pct==null||pct<=0)?'var(--tx3)':'var(--accent)';};
     ['aho','nec','luj'].forEach(g=>paint(document.getElementById('done-'+g),realG[g]||0,acts[g]||0));
-    paint(document.getElementById('mc-done'),realG.aho+realG.nec+realG.luj,gas);
+    const realT=realG.aho+realG.nec+realG.luj;
+    paint(document.getElementById('mc-done'),realT,gas);
+    // Barra de liquidez bajo el macro: pagaste (azul) vs falta soltar (morado), en plata.
+    const bar=document.getElementById('paybar'), lbl=document.getElementById('paybar-l');
+    if(bar&&lbl){
+      if(gas>0.5){
+        const paidC=Math.min(realT,gas), rest=Math.max(gas-realT,0);
+        bar.style.display=''; lbl.style.display='';
+        document.getElementById('pb-paid').style.width=(paidC/gas*100)+'%';
+        document.getElementById('pb-rest').style.width=(rest/gas*100)+'%';
+        document.getElementById('pbl-paid').textContent='✓ Pagaste '+pe(paidC);
+        document.getElementById('pbl-rest').textContent=rest>0.5?'Falta soltar '+pe(rest):'¡Todo pagado! 🎉';
+      } else { bar.style.display='none'; lbl.style.display='none'; }
+    }
   })();
   document.getElementById('b-gas').textContent=pe(gas);
   const saldo=ti-gas,sl=document.getElementById('b-sl');
