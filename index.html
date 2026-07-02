@@ -1214,29 +1214,28 @@ function recompute(){
     bar.style.width=pctFill+'%';
     bar.style.background=(act>tgt)?'var(--bad)':'var(--ok)';
   });
-  // Cascada: el excedente de Ahorro (el MISMO "excede" del bucket, act-tgt, incluye deuda)
-  // se come primero Gustos, luego Necesidades. Indicador único por bucket que cambia de signo:
-  // neto = meta − gastado − comido_por_cascada. >0 = libre (verde), <0 = déficit (rojo).
-  // Líneas bajo cada sección (abajo del Meta/Gastado): ROJO = lo que se reduce; AZUL punteado = el margen
-  // que queda; (verde = el reparto, en .rollbonus). Todo dentro de .sec-lines → se oculta al minimizar.
-  const overTotal=Math.max((acts.aho||0)-(tgts.aho||0),0);
-  lastOver=overTotal; // para decidir el orden del wizard (Gustos primero si hay exceso)
-  let over=overTotal;
-  const eatenLuj=Math.min(over,tgts.luj||0);over-=eatenLuj;
-  const eatenNec=Math.min(over,tgts.nec||0);
-  const eatenOf={luj:eatenLuj,nec:eatenNec};
+  // Cascada EN CADENA: el excedente de Ahorro (act−meta, incluye deuda) se arrastra a Gustos; si Gustos
+  // queda negativo, ESE déficit se arrastra a Necesidades. Cada caja: Utilizado = gasto propio + lo
+  // arrastrado; Disponible = meta − Utilizado. Líneas rojas dicen "− X se arrastra de excedente de …".
+  const overAho=Math.max((acts.aho||0)-(tgts.aho||0),0);
+  lastOver=overAho; // para decidir el orden del wizard (Gustos primero si hay exceso)
   const showLn=(id,txt,cls)=>{const e=document.getElementById(id);if(!e)return;e.textContent=txt||'';e.className=cls;e.style.display=txt?'':'none';};
-  // Disponible por sección (3ra columna de la tríada): verde si queda, rojo si negativo.
   const setDisp=(g,v)=>{const e=document.getElementById('disp-'+g);if(e){e.textContent=pn(v);e.style.color=v<-0.5?'var(--bad)':(v>0.5?'var(--ok)':'var(--tx2)');}};
-  setDisp('aho', (tgts.aho||0)-(acts.aho||0)); // ahorro: negativo si el exceso cae en cascada
-  ['luj','nec'].forEach(g=>{
-    const eat=eatenOf[g]||0, util=(acts[g]||0)+eat, neto=(tgts[g]||0)-util; // Utilizado incluye el excedente de ahorro que cayó aquí
-    const smg=document.getElementById('sm-'+g); if(smg)smg.textContent=pn(util);
-    setDisp(g, neto);
-    showLn('red-'+g, eat>0.5?'(+ '+pe(eat)+' excedente de ahorro)':'', 'ln-red');
-    showLn('mg-'+g, '', 'ln-mg');
-  });
-  showLn('red-aho', overTotal>0.5?'− '+pe(overTotal)+' se deduce primero de gustos, luego de necesidades':'', 'ln-red');
+  setDisp('aho', (tgts.aho||0)-(acts.aho||0)); // ahorro: negativo si gastaste más del 20%
+  // Gustos absorbe el excedente de ahorro
+  const utilLuj=(acts.luj||0)+overAho, dispLuj=(tgts.luj||0)-utilLuj;
+  const overLuj=Math.max(-dispLuj,0); // déficit de gustos → se arrastra a necesidades
+  {const sm=document.getElementById('sm-luj'); if(sm)sm.textContent=pn(utilLuj);}
+  setDisp('luj', dispLuj);
+  showLn('red-luj', overAho>0.5?'− '+pe(overAho)+' se arrastra de excedente de ahorro':'', 'ln-red');
+  showLn('mg-luj', '', 'ln-mg');
+  // Necesidades absorbe el déficit de gustos
+  const utilNec=(acts.nec||0)+overLuj, dispNec=(tgts.nec||0)-utilNec;
+  {const sm=document.getElementById('sm-nec'); if(sm)sm.textContent=pn(utilNec);}
+  setDisp('nec', dispNec);
+  showLn('red-nec', overLuj>0.5?'− '+pe(overLuj)+' se arrastra de excedente de gustos':'', 'ln-red');
+  showLn('mg-nec', '', 'ln-mg');
+  showLn('red-aho', overAho>0.5?'− '+pe(overAho)+' se arrastra a gustos (y lo que sobre, a necesidades)':'', 'ln-red');
   showLn('mg-aho', '', 'ln-mg');
   // Macro (arriba): Presupuestado (tu presupuesto total) / Utilizado (lo asignado, naranja) / Disponible (lo que queda).
   (function(){
