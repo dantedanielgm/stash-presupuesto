@@ -1193,6 +1193,7 @@ function informeH(){
 function refreshInforme(){const el=document.getElementById('informe-body');if(el)el.innerHTML=informeH();}
 function recompute(){
   syncParents();
+  if(typeof ensureDebtSnaps==='function')ensureDebtSnaps(); // migra/rellena las fotos de deuda antes de mostrar
   if(typeof reconcileTjDebts==='function')reconcileTjDebts();
   const ti=sum(d.inc);
   const ge=(id)=>document.getElementById(id);
@@ -1351,8 +1352,15 @@ app.addEventListener('click',e=>{
   const dc=e.target.closest('[data-deudaclear]'); // × de "Deuda": quita del ciclo las deudas elegidas (reversible)
   if(dc){const sel=d.debtPay?Object.keys(d.debtPay):[]; if(!sel.length)return;
     if(confirm('¿Quitar las '+sel.length+' deuda(s) elegidas de este ciclo? Puedes volver a agregarlas del banco (o Deshacer).')){
-      snapshot(); d.debtPay={}; save(); render(); if(typeof renderDebts==='function')renderDebts();}
+      snapshot(); d.debtPay={}; d.debtSnap={}; save(); render(); if(typeof renderDebts==='function')renderDebts();}
     return;}
+  const dap=e.target.closest('[data-deudaallpaid]'); // check "Deuda": marca/desmarca TODAS las deudas del ciclo
+  if(dap){const sel=Object.keys(d.debtPay||{}).filter(n=>debts.some(x=>x.n===n&&!x.auto)); if(!sel.length)return;
+    const allPaid=sel.every(n=>d.paid&&d.paid[n]); snapshot();
+    if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={};
+    sel.forEach(n=>{ if(allPaid){delete d.paid[n];delete d.paidAmt[n];}
+      else {const s=snapOf(n)||debts.find(z=>z.n===n)||{}; d.paid[n]=true; d.paidAmt[n]=debtAmt(s,(d.debtPay[n])||'min');} });
+    save(); if(typeof renderDebts==='function')renderDebts(); render(); return;}
   const al=e.target.closest('[data-addline]');
   if(al){const i=+al.dataset.addline;tjOpen=null;view='inicio';collapsed.aho=false;pickerOpen='card';debtForm={kind:'card',idx:i};render();const s=document.getElementById('sec-aho');if(s)s.scrollIntoView({behavior:'smooth',block:'start'});return;}
   const b=e.target.closest('button');if(!b)return;
@@ -1391,8 +1399,14 @@ app.addEventListener('click',e=>{
   else if(b.dataset.reset){if(confirm('¿Reiniciar esta quincena? Se borran los montos actuales.')){snapshot();d=def();save();render();}}
   else if(b.dataset.openpicker){pickerOpen=b.dataset.openpicker;debtForm=null;render();}
   else if(b.dataset.pickerclose){pickerOpen=null;debtForm=null;render();}
-  else if(b.dataset.pickdebt!==undefined){const nm=b.dataset.pickdebt,mo=b.dataset.m;if(mo==='otro'&&!promptOtroMonto(nm))return;if(!d.debtPay)d.debtPay={};d.debtPay[nm]=mo;save();render();}
-  else if(b.dataset.unpick!==undefined){if(d.debtPay)delete d.debtPay[b.dataset.unpick];save();render();}
+  else if(b.dataset.pickdebt!==undefined){const nm=b.dataset.pickdebt,mo=b.dataset.m;if(mo==='otro'&&!promptOtroMonto(nm))return;if(!d.debtPay)d.debtPay={};d.debtPay[nm]=mo;
+    const x=debts.find(z=>z.n===nm);if(x){if(!d.debtSnap)d.debtSnap={};d.debtSnap[nm]=snapCapture(x);}save();render();} // capta la FOTO al elegir
+  else if(b.dataset.pickloan!==undefined){const nm=b.dataset.pickloan,x=debts.find(z=>z.n===nm); // préstamo: monto único
+    const def=x?(parseFloat(x.total)||parseFloat(x.mes)||parseFloat(x.min)||''):'';
+    if(!promptOtroMonto(nm,def))return; if(!d.debtPay)d.debtPay={};d.debtPay[nm]='otro';
+    if(x){if(!d.debtSnap)d.debtSnap={};d.debtSnap[nm]=snapCapture(x);}save();render();}
+  else if(b.dataset.loanamt!==undefined){if(promptOtroMonto(b.dataset.loanamt)){save();render();}}
+  else if(b.dataset.unpick!==undefined){const nm=b.dataset.unpick;if(d.debtPay)delete d.debtPay[nm];if(d.debtSnap)delete d.debtSnap[nm];if(d.paid)delete d.paid[nm];if(d.paidAmt)delete d.paidAmt[nm];save();render();}
   else if(b.dataset.newdebt){debtForm={kind:b.dataset.newdebt,idx:'new'};render();}
   else if(b.dataset.editdebt!==undefined){debtForm={kind:b.dataset.kind,idx:+b.dataset.editdebt};render();}
   else if(b.dataset.debtformcancel){debtForm=null;render();}
@@ -1649,9 +1663,9 @@ function debtAmtLabel(x,mode){
   if(raw===''||raw==null) return '?';
   return pe(debtAmt(x,mode));
 }
-// Al elegir "Otro": pregunta el monto (precargado si ya había uno) y lo guarda. false = canceló/inválido.
-function promptOtroMonto(name){
-  const cur=(d.otroMonto&&d.otroMonto[name])!=null?d.otroMonto[name]:'';
+// Al elegir "Otro" / monto de préstamo: pregunta el monto (precargado) y lo guarda. false = canceló.
+function promptOtroMonto(name,def){
+  const cur=(d.otroMonto&&d.otroMonto[name])!=null&&d.otroMonto[name]!==''?d.otroMonto[name]:(def!=null?def:'');
   const inp=prompt('¿Qué monto pagas a "'+name+'" esta quincena?',cur||'');
   if(inp===null)return false;
   const v=parseFloat(inp); if(isNaN(v)||v<0)return false;
@@ -1659,43 +1673,40 @@ function promptOtroMonto(name){
   d.otroMonto[name]=v;
   return true;
 }
+// ===== FOTO (snapshot) de la deuda al presupuestarla =====
+// El presupuesto guarda una copia congelada de la deuda al momento de agregarla al ciclo. Se muestra
+// SIEMPRE esa foto (min/disponible tal cual estaban), aunque luego actualices la deuda en el tab Deudas.
+// Marcar pagado = solo un check; NO toca los datos reales (esos se editan en Deudas, fuente para ciclos futuros).
+function snapCapture(x){return {n:x.n, kind:isCardDebt(x)?'card':'loan', min:x.min, mes:x.mes, total:x.total, disp:x.disp, limite:x.limite, tcea:x.tcea, vence:x.vence};}
+function snapOf(name){return (d.debtSnap&&d.debtSnap[name])||null;}
+// Rellena fotos faltantes de deudas ya elegidas. Para las ya pagadas con el modelo viejo (que borró
+// min/disp de la deuda real), recupera los valores pre-pago desde paidFields → la foto queda correcta.
+function ensureDebtSnaps(){
+  if(!d.debtPay)return; if(!d.debtSnap)d.debtSnap={};
+  Object.keys(d.debtPay).forEach(name=>{
+    if(d.debtSnap[name])return;
+    const x=debts.find(z=>z.n===name); if(!x)return;
+    const base=snapCapture(x);
+    const pf=d.paidFields&&d.paidFields[name];
+    if(pf){ ['total','disp','min','mes'].forEach(k=>{ if(pf[k]!==undefined&&pf[k]!=='') base[k]=pf[k]; }); }
+    d.debtSnap[name]=base;
+  });
+}
 function debtPaySum(){if(!d.debtPay)return 0;return debts.filter(x=>!x.auto).reduce((t,x)=>{
   if(!d.debtPay[x.n])return t;
-  if(d.paid&&d.paid[x.n]&&d.paidAmt&&d.paidAmt[x.n]!=null)return t+(parseFloat(d.paidAmt[x.n])||0); // ya pagada: usa el monto pagado (su mín quedó en blanco)
-  return t+debtAmt(x,d.debtPay[x.n]);
+  if(d.paid&&d.paid[x.n]&&d.paidAmt&&d.paidAmt[x.n]!=null)return t+(parseFloat(d.paidAmt[x.n])||0);
+  return t+debtAmt(snapOf(x.n)||x,d.debtPay[x.n]); // desde la FOTO congelada, no la deuda viva
 },0);}
-// Asentar un pago de deuda: al marcar ✓, baja el saldo de esa deuda en el banco (se arrastra a los
-// siguientes ciclos). Al desmarcar, lo devuelve exacto. Guarda el monto aplicado para revertir bien.
+// Marcar/desmarcar pago de deuda: SOLO un check. NO toca los datos reales de la deuda (esos se
+// actualizan en el tab Deudas — fuente para ciclos futuros). El presupuesto muestra la FOTO congelada,
+// así que el min/disponible NO cambian al pagar. pago = monto de la foto, para el ejecutado.
 function toggleDebtPaid(name){
-  if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={}; if(!d.paidFields)d.paidFields={};
-  const x=debts.find(z=>z.n===name);
-  if(d.paid[name]){ // destildar: restaura los campos guardados (saldo/disponible/mín/mes)
-    snapshot();
-    if(x&&!x.auto){ const pf=d.paidFields[name]; if(pf){ ['total','disp','min','mes'].forEach(k=>{ if(pf[k]!==undefined)x[k]=pf[k]; }); } }
-    delete d.paid[name]; delete d.paidAmt[name]; delete d.paidFields[name];
-  } else { // marcar: asienta el pago. pago = lo que pagaste (cuenta como real / ejecutado)
-    let pago=0;
-    if(x&&!x.auto){
-      pago=debtAmt(x,(d.debtPay&&d.debtPay[name])||'min');
-      if(isCardDebt(x)){
-        // tarjeta: el pago LIBERA disponible. El saldo se deriva de línea − disponible.
-        const oldDisp=parseFloat(x.disp)||0;
-        const inp=prompt('Pagaste '+pe(pago)+' a "'+name+'".\n\nNuevo DISPONIBLE de la tarjeta — subió ~'+pe(pago)+', pero el interés puede dejarlo en menos. Pon el que ves en tu banco:', Math.round(oldDisp+pago));
-        if(inp===null) return; // canceló
-        snapshot();
-        d.paidFields[name]={total:x.total, disp:x.disp, min:x.min, mes:x.mes};
-        const nd=parseFloat(inp), newDisp=isNaN(nd)?oldDisp+pago:Math.max(nd,0);
-        x.disp=newDisp; x.total=Math.max((parseFloat(x.limite)||0)-newDisp,0); x.min=''; x.mes='';
-      } else {
-        // préstamo: baja el saldo por el pago. Mín/mes son la cuota fija — no se borran ni se pregunta.
-        snapshot();
-        d.paidFields[name]={total:x.total};
-        x.total=Math.max((parseFloat(x.total)||0)-pago,0);
-      }
-    } else { snapshot(); }
-    d.paid[name]=true; d.paidAmt[name]=pago;
-  }
-  saveDebts(); save(); render(); if(typeof renderDebts==='function')renderDebts();
+  if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={};
+  snapshot();
+  if(d.paid[name]){ delete d.paid[name]; delete d.paidAmt[name]; }
+  else { const s=snapOf(name)||debts.find(z=>z.n===name)||{};
+    d.paid[name]=true; d.paidAmt[name]=debtAmt(s,(d.debtPay&&d.debtPay[name])||'min'); }
+  save(); if(typeof renderDebts==='function')renderDebts(); render();
 }
 // Ejecutado/real POR CAJA: lo ya marcado como pagado. nec/luj/aho = categorías con ✓ (efectivo);
 // aho además suma los pagos de deuda asentados (los checks de deuda viven en Ahorro).
@@ -1709,14 +1720,19 @@ function ejecutadoPorGrupo(){
       if(padre&&!row.tj) r[g]+=parseFloat(row.a)||0;
     }
   });});
-  if(d.paid){ debts.filter(x=>!x.auto).forEach(x=>{ if(d.paid[x.n]) r.aho+=(parseFloat(d.paidAmt&&d.paidAmt[x.n])||debtAmt(x,(d.debtPay&&d.debtPay[x.n])||'min')); }); }
+  if(d.paid){ debts.filter(x=>!x.auto).forEach(x=>{ if(d.paid[x.n]) r.aho+=(parseFloat(d.paidAmt&&d.paidAmt[x.n])||debtAmt(snapOf(x.n)||x,(d.debtPay&&d.debtPay[x.n])||'min')); }); }
   return r;
 }
 function ejecutadoSum(){const r=ejecutadoPorGrupo();return r.aho+r.nec+r.luj;}
 function recommendedDebt(){const c=debts.filter(x=>!x.auto&&x.vence).sort((a,b)=>dateVal(a.vence)-dateVal(b.vence))[0];return c?c.n:null;}
 function modeToggleH(x){
+  const s=snapOf(x.n)||x;
+  const isLoan=(s.kind==='loan')||isLoanDebt(x);
+  if(isLoan){ // préstamo = monto único editable (sin Mín/Mes/Total). Toca para cambiarlo.
+    return '<div class="dmodes"><button class="dmode on" data-loanamt="'+esc(x.n)+'" title="Cambiar el monto">Monto '+debtAmtLabel(s,'otro')+' ✎</button></div>';
+  }
   const m=(d.debtPay&&d.debtPay[x.n])||'min';
-  const opt=(mode,lbl)=>'<button class="dmode'+(m===mode?' on':'')+'" data-debtmode="'+esc(x.n)+'" data-m="'+mode+'">'+lbl+' '+debtAmtLabel(x,mode)+'</button>';
+  const opt=(mode,lbl)=>'<button class="dmode'+(m===mode?' on':'')+'" data-debtmode="'+esc(x.n)+'" data-m="'+mode+'">'+lbl+' '+debtAmtLabel(s,mode)+'</button>';
   return '<div class="dmodes">'+opt('min','Mín')+opt('mes','Mes')+opt('total','Total')+opt('otro','Otro')+'</div>';
 }
 function debtPickerH(kind){
@@ -1731,20 +1747,23 @@ function debtPickerH(kind){
       '<span class="pk-act"><button class="pk-edit" data-editdebt="'+i+'" data-kind="'+kind+'" title="Editar">&#9998;</button>'+
       '<button class="pk-del" data-deldebt="'+i+'" title="Quitar del banco">&times;</button></span></div>'+
       '<div class="pk-info">'+(x.vence?'vence '+dueLabel(x.vence):'sin fecha')+(isCard?' · disp '+pe(cardAvail(x)):' · debes '+pe(parseFloat(x.total)||0))+'</div>'+
-      '<div class="pk-modes">'+mb('min','Mín')+mb('mes','Mes')+mb('total','Total')+mb('otro','Otro')+'</div></div>';
+      '<div class="pk-modes">'+(isCard
+        ? mb('min','Mín')+mb('mes','Mes')+mb('total','Total')+mb('otro','Otro')
+        : '<button class="pk-m" data-pickloan="'+esc(x.n)+'">Elegir monto</button>')+'</div></div>';
   }).join('');
   if(!list.length) rows='<div class="pk-empty">No te queda '+(isCard?'ninguna tarjeta':'ningún préstamo')+' por elegir. Agrega '+(isCard?'una':'uno')+' al banco abajo.</div>';
-  return '<div class="debtpicker"><div class="pk-h">¿Cuál pagas esta quincena? Toca el monto (Mín / Mes / Total).</div>'+rows+
+  return '<div class="debtpicker"><div class="pk-h">¿Cuál pagas esta quincena?'+(isCard?' Toca el monto (Mín / Mes / Total / Otro).':' Pon el monto a pagar.')+'</div>'+rows+
     '<button class="pk-new" data-newdebt="'+kind+'"><span class="p">+</span> Agregar '+(isCard?'tarjeta':'préstamo')+' al banco</button>'+
     debtFormH()+
     '<button class="pk-done" data-pickerclose="1">Listo</button></div>';
 }
 function selectedDebtRowH(x,kind){
   const paid=!!(d.paid&&d.paid[x.n]);
+  const s=snapOf(x.n)||x; // FOTO congelada: el disponible se muestra tal cual estaba al presupuestar
   const icon=kind==='card'?'<span class="dd-ic">'+TJ_SVG+'</span>':'';
   return '<div class="row sub'+(paid?' is-paid':'')+'">'+icon+
     '<span class="dd-n">'+esc(x.n)+'</span>'+
-    (kind==='card'?'<span class="dd-d">disp '+pe(cardAvail(x))+'</span>':'')+
+    (kind==='card'?'<span class="dd-d">disp '+pe(cardAvail(s))+'</span>':'')+
     '<button class="rm" data-unpick="'+esc(x.n)+'" title="Quitar de esta quincena">&times;</button>'+
     '<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-debtpaid="'+esc(x.n)+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button></div>'+
     modeToggleH(x);
@@ -1754,17 +1773,19 @@ function ahoDebtBlockH(){
   const loans=debts.filter(x=>isLoanDebt(x)&&sel[x.n]);
   const cards=debts.filter(x=>isCardDebt(x)&&sel[x.n]);
   const planned=debtPaySum();
-  const paidS=(d.paid)?debts.filter(x=>!x.auto&&sel[x.n]&&d.paid[x.n]).reduce((t,x)=>t+debtAmt(x,sel[x.n]),0):0;
+  const paidS=(d.paid)?debts.filter(x=>!x.auto&&sel[x.n]&&d.paid[x.n]).reduce((t,x)=>t+debtAmt(snapOf(x.n)||x,sel[x.n]),0):0;
   const folded=!!collapsed['deuda'];
+  const selNames=Object.keys(sel).filter(n=>debts.some(x=>x.n===n&&!x.auto));
+  const allDebtsPaid=selNames.length>0 && selNames.every(n=>d.paid&&d.paid[n]); // el check padre refleja todas ✓
   // "Deuda" = fila cohesionada con las categorías de Ahorro: [chevron][Deuda][total en la columna del
-  // monto][× quitar deudas del ciclo][espacio del check]. Mismas posiciones que "Ahorro"/"Inversión".
+  // monto][× quitar deudas del ciclo][check que marca/desmarca TODAS]. Mismas posiciones que "Ahorro".
   return '<div class="dgroup">'+
     '<div class="row dg-fold" title="Plegar/desplegar deudas">'+
       '<button class="subtoggle" data-deudafold="1">'+(folded?'▸':'▾')+'</button>'+
       '<span class="l dd-name" data-deudafold="1">Deuda</span>'+
       '<span class="a dg-total">'+pe(planned)+'</span>'+
       '<button class="rm" data-deudaclear="1" aria-label="Quitar deudas del ciclo" title="Quitar del ciclo las deudas elegidas">&times;</button>'+
-      '<span class="pchk-sp"></span>'+
+      '<button class="pcheck pchk-paid'+(allDebtsPaid?' on':'')+'" data-deudaallpaid="1" title="Marcar/desmarcar todas las deudas del ciclo">'+(allDebtsPaid?'✓':'')+'</button>'+
     '</div>'+
     (folded?'':
       '<div class="dlegend">Toca <b>+</b> para elegir del banco qué pagar esta quincena. Marca el check <b>azul</b> cuando ya lo pagaste.</div>'+
@@ -1934,6 +1955,7 @@ function invertirH(){
 function refreshInvertir(){const e=document.getElementById('sec-invertir');if(e)e.innerHTML=invertirH();}
 function renderDebts(){
   const el=document.getElementById('debts');if(!el)return;
+  if(typeof ensureDebtSnaps==='function')ensureDebtSnaps();
   el.innerHTML=
     '<div id="debts-mgmt">'+
       '<h2>Deudas y tarjetas</h2>'+
