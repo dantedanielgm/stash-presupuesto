@@ -165,7 +165,7 @@ body.focuson .reset{display:none}
 .triad{display:grid; grid-template-columns:1fr 1fr 1fr; gap:.4rem; text-align:center; margin:.4rem 0 .6rem}
 .triad .tr{display:flex; flex-direction:column; gap:.12rem; min-width:0}
 .triad .tr i{font-size:9.5px; color:var(--tx3); font-weight:500; font-style:normal; text-transform:uppercase; letter-spacing:.02em}
-.triad .tr b{font-size:15px; font-weight:800; color:var(--tx); font-variant-numeric:tabular-nums}
+.triad .tr b{font-size:13px; font-weight:800; color:var(--tx); font-variant-numeric:tabular-nums}
 .macro .mc-v.tr-util,.triad .tr b.tr-util{color:#e0872b}
 .rollbonus b{font-weight:700}
 .rb-pct{color:var(--tx3); font-size:11px}
@@ -604,10 +604,12 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 #sec-aho.sec-tint{background:rgba(52,199,89,.07); border-color:rgba(52,199,89,.32)}
 #sec-nec.sec-tint{background:rgba(0,113,227,.06); border-color:rgba(0,113,227,.28)}
 #sec-luj.sec-tint{background:rgba(224,146,47,.08); border-color:rgba(224,146,47,.32)}
-/* Macro y tríadas pasan de 3 a 4 columnas: Presupuestado · Utilizado · Disponible · ✓ Pagado */
-.macro,.triad{grid-template-columns:repeat(4,1fr)}
+/* Macro y tríadas: Presupuestado · Utilizado · Disponible · Repartido · ✓ Pagado (5 columnas).
+   Los valores de estas celdas van SIN "S/" (pn(), no pe()) — el "S/" ya está grande arriba en el
+   hero; repetirlo 5 veces por fila no cabe a 375px y no suma información nueva. */
+.macro,.triad{grid-template-columns:repeat(5,1fr)}
 .macro .mc-l{font-size:9.5px}
-.macro .mc-v{font-size:15px}
+.macro .mc-v{font-size:14px}
 .mc-tap{cursor:pointer; border-radius:8px; transition:background .15s; padding:.1rem 0}
 .mc-tap:hover{background:var(--line2)}
 .mc-hint{font-size:9px; color:var(--accent); border:1px solid var(--accent); border-radius:10px; padding:0 .35rem; margin:.2rem auto 0; width:max-content}
@@ -619,7 +621,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .pchk-paid:not(.on){border-color:var(--accent)}
 .pchk-paid.on{background:var(--accent); border-color:var(--accent)}
 /* En celular las 4 etiquetas caben sin recortarse */
-@media(max-width:420px){.macro .mc-l,.triad .tr i{font-size:8.5px; letter-spacing:0}}
+@media(max-width:420px){.macro .mc-l,.triad .tr i{font-size:7.8px; letter-spacing:-.01em}}
 </style>
 </head>
 <body>
@@ -988,6 +990,8 @@ function cerrarQuincena(){
 function snapshot(){history.push(JSON.stringify({d:d,debts:(typeof debts!=='undefined'?debts:[])}));if(history.length>50)history.shift();updateUndo();}
 function updateUndo(){const u=document.getElementById('undo');if(u)u.hidden=history.length===0;}
 const pe=n=>'S/ '+Math.round(n).toLocaleString('es-PE');
+// Sin "S/": para las celdas del macro/tríada (5 columnas) — el signo ya está grande en el hero de arriba.
+const pn=n=>Math.round(n).toLocaleString('es-PE');
 const sum=a=>a.reduce((t,r)=>t+(parseFloat(r.a)||0),0);
 // Efectivo y tarjeta, contemplando tarjeteo a nivel de subcategoría (no solo de categoría).
 const sumCash=a=>a.reduce((t,r)=>t+(hasSubs(r)?(r.tj?0:r.sub.reduce((u,s)=>u+(s.tj?0:(parseFloat(s.a)||0)),0)):(r.tj?0:(parseFloat(r.a)||0))),0);
@@ -1067,9 +1071,10 @@ function bucketH(g,name,pct,num){
     '<div class="sec-h tappable" data-collapse="'+g+'" title="Plegar/desplegar"><span class="tw"><span class="num num-'+g+'">'+num+'</span><span class="t">'+name+'</span></span><span class="sec-r"><span class="pct">'+Math.round(pct*100)+'%</span><span class="chev">'+(col?'▸':'▾')+'</span></span></div>'+
     (g==='aho'&&!col?'<div class="sec-note">Págate primero — esto sale antes de gastar.</div>':'')+
     '<div class="triad">'+
-      '<span class="tr"><i>Presupuestado</i><b id="tg-'+g+'">&mdash;</b></span>'+
+      '<span class="tr"><i>Presup.</i><b id="tg-'+g+'">&mdash;</b></span>'+
       '<span class="tr"><i>Utilizado</i><b class="tr-util" id="sm-'+g+'">&mdash;</b></span>'+
       '<span class="tr"><i>Disponible</i><b id="disp-'+g+'">&mdash;</b></span>'+
+      '<span class="tr"><i>Repartido</i><b id="repto-'+g+'" style="color:var(--ok)">&mdash;</b></span>'+
       '<span class="tr tr-tap" data-openchecks="'+g+'" title="Ver qué falta pagar aquí"><i>✓ Pagado</i><b id="done-'+g+'">&mdash;</b></span>'+
     '</div>'+
     '<div class="bar"><div class="bar-fill" id="bar-'+g+'"></div></div>'+
@@ -1115,9 +1120,10 @@ function render(){
     '</div>'+
     '<div class="heart macro-card" id="heart">'+
       '<div class="macro">'+
-        '<div class="mc"><span class="mc-l">Presupuestado</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">Presup.</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
         '<div class="mc"><span class="mc-l">Utilizado</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
         '<div class="mc mc-tap" data-macrodisp="1" title="Dale un destino a lo disponible"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span><span class="mc-hint">↻ 50/30/20</span></div>'+
+        '<div class="mc"><span class="mc-l">Repartido</span><span class="mc-v" style="color:var(--tx3)">&mdash;</span></div>'+
         '<div class="mc"><span class="mc-l">✓ Pagado</span><span class="mc-v" id="mc-done">&mdash;</span></div>'+
       '</div>'+
       '<div id="macro-assign"></div>'+
@@ -1186,8 +1192,8 @@ function recompute(){
   buckets.forEach(b=>{const g=b[0];let act=(g==='nec'||g==='luj')?sumCash(d[g]):sum(d[g]);
     if(g==='aho'){act+=debtPaySum();}
     const tgt=ti*b[2];gas+=act;acts[g]=act;tgts[g]=tgt;
-    document.getElementById('tg-'+g).textContent=pe(tgt);
-    document.getElementById('sm-'+g).textContent=pe(act);
+    document.getElementById('tg-'+g).textContent=pn(tgt);
+    document.getElementById('sm-'+g).textContent=pn(act);
     const bar=document.getElementById('bar-'+g);
     const pctFill=tgt>0?Math.min(act/tgt*100,100):0;
     bar.style.width=pctFill+'%';
@@ -1206,11 +1212,11 @@ function recompute(){
   const eatenOf={luj:eatenLuj,nec:eatenNec};
   const showLn=(id,txt,cls)=>{const e=document.getElementById(id);if(!e)return;e.textContent=txt||'';e.className=cls;e.style.display=txt?'':'none';};
   // Disponible por sección (3ra columna de la tríada): verde si queda, rojo si negativo.
-  const setDisp=(g,v)=>{const e=document.getElementById('disp-'+g);if(e){e.textContent=pe(v);e.style.color=v<-0.5?'var(--bad)':(v>0.5?'var(--ok)':'var(--tx2)');}};
+  const setDisp=(g,v)=>{const e=document.getElementById('disp-'+g);if(e){e.textContent=pn(v);e.style.color=v<-0.5?'var(--bad)':(v>0.5?'var(--ok)':'var(--tx2)');}};
   setDisp('aho', (tgts.aho||0)-(acts.aho||0)); // ahorro: negativo si el exceso cae en cascada
   ['luj','nec'].forEach(g=>{
     const eat=eatenOf[g]||0, util=(acts[g]||0)+eat, neto=(tgts[g]||0)-util; // Utilizado incluye el excedente de ahorro que cayó aquí
-    const smg=document.getElementById('sm-'+g); if(smg)smg.textContent=pe(util);
+    const smg=document.getElementById('sm-'+g); if(smg)smg.textContent=pn(util);
     setDisp(g, neto);
     showLn('red-'+g, eat>0.5?'(+ '+pe(eat)+' excedente de ahorro)':'', 'ln-red');
     showLn('mg-'+g, '', 'ln-mg');
@@ -1219,10 +1225,10 @@ function recompute(){
   showLn('mg-aho', '', 'ln-mg');
   // Macro (arriba): Presupuestado (tu presupuesto total) / Utilizado (lo asignado, naranja) / Disponible (lo que queda).
   (function(){
-    const p=document.getElementById('mc-pres'); if(p)p.textContent=pe(ti);
-    const u=document.getElementById('mc-util'); if(u)u.textContent=pe(gas);
+    const p=document.getElementById('mc-pres'); if(p)p.textContent=pn(ti);
+    const u=document.getElementById('mc-util'); if(u)u.textContent=pn(gas);
     const disp=ti-gas, de=document.getElementById('mc-disp');
-    if(de){de.textContent=pe(disp); de.style.color=disp<-0.5?'var(--bad)':'var(--ok)';}
+    if(de){de.textContent=pn(disp); de.style.color=disp<-0.5?'var(--bad)':'var(--ok)';}
   })();
   // 4ª columna "✓ Pagado": % de lo comprometido que ya marcaste como real — por caja y global.
   (function(){
@@ -1247,10 +1253,13 @@ function recompute(){
   // al hacer el rollover (d.rollover). Persiste — no se recalcula en vivo.
   // Rollover DINÁMICO: reparte el saldo libre ACTUAL. Si pagas más deuda y baja el saldo, baja/desaparece solo.
   const _ro={aho:0.2,nec:0.5,luj:0.3};
-  ['aho','nec','luj'].forEach(g=>{const el=document.getElementById('roll-'+g);if(!el)return;
+  ['aho','nec','luj'].forEach(g=>{
     const amt=showRollover?Math.max(saldo,0)*_ro[g]:0;
-    if(amt>0.5){el.style.display='';el.innerHTML='↻ Disponible para gastar aquí: <b>+ '+pe(amt)+'</b>';}
-    else{el.style.display='none';el.innerHTML='';}});
+    const el=document.getElementById('roll-'+g);
+    if(el){ if(amt>0.5){el.style.display='';el.innerHTML='↻ Disponible para gastar aquí: <b>+ '+pe(amt)+'</b>';}
+    else{el.style.display='none';el.innerHTML='';} }
+    const rp=document.getElementById('repto-'+g); if(rp)rp.textContent=amt>0.5?'+'+pn(amt):'—';
+  });
   // Panel "dale un destino" — vive bajo el macro, se abre tocando el Disponible de arriba.
   const ma=document.getElementById('macro-assign');
   if(ma) ma.innerHTML = macroAssignOpen
