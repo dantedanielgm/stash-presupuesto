@@ -182,11 +182,14 @@ body.focuson .reset{display:none}
 .cuotas-toggle{display:block; width:100%; margin-top:.6rem; padding:.6rem; border:1px solid var(--line); background:transparent; color:var(--tx2); font:inherit; font-size:12.5px; border-radius:var(--rad-sm); cursor:pointer; transition:.15s}
 .cuotas-toggle:hover{border-color:var(--accent); color:var(--accent)}
 .cuotas-toggle .cc{background:var(--accent); color:#fff; border-radius:10px; padding:.05rem .4rem; font-size:11px; font-weight:700; margin-left:.3rem}
-/* Colapsar secciones (vista de pájaro) */
-.sec-h.tappable{cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none; border-radius:8px; margin:-.2rem -.4rem .2rem; padding:.2rem .4rem; transition:background .15s}
+/* Colapsar secciones: chevron a la IZQUIERDA (igual que las categorías), luego el número y
+   "NOMBRE · 20%" juntos. Antes el chevron y el % estaban a la derecha — ahora todo a la izquierda. */
+.sec-h.tappable{cursor:pointer; display:flex; align-items:center; justify-content:flex-start; gap:.5rem; user-select:none; border-radius:8px; margin:-.2rem -.4rem .2rem; padding:.2rem .4rem; transition:background .15s}
 .sec-h.tappable:hover{background:var(--line2)}
+.sec-h .secpct{color:var(--tx3); font-weight:500}
 .sec-r{display:flex; align-items:center; gap:.6rem}
 .chev{color:var(--tx3); font-size:13px; line-height:1; transition:color .15s}
+.sec-h.tappable .chev{width:14px; text-align:center; flex:none}
 .sec-h.tappable:hover .chev{color:var(--accent)}
 /* Tab bar inferior */
 .tabbar{position:fixed; left:0; right:0; bottom:0; z-index:50; display:flex; background:var(--card); border-top:1px solid var(--line); box-shadow:0 -2px 12px rgba(0,0,0,.05)}
@@ -322,9 +325,7 @@ body.focuson .ov-bar{display:none}
 .pcheck:hover{border-color:var(--accent)}
 .pcheck.on{background:var(--ok); border-color:var(--ok)}
 .pl.is-paid{opacity:.5}
-.pl.is-paid .nm{text-decoration:line-through}
 .row.sub.is-paid{opacity:.55}
-.row.sub.is-paid input.l{text-decoration:line-through}
 .paidbar{display:flex; gap:.8rem; font-size:12.5px; color:var(--tx2); margin:.2rem 0 .8rem; padding:.5rem .7rem; background:var(--line2); border-radius:var(--rad-sm)}
 .paidbar b{color:var(--tx); font-variant-numeric:tabular-nums}
 .wf-box{background:var(--line2); border-radius:var(--rad-sm); padding:.7rem .85rem; margin:.4rem 0 1rem}
@@ -400,8 +401,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .dtotal{font-size:12.5px; color:var(--tx2); margin-top:.7rem; padding-top:.55rem; border-top:1px solid var(--line2)}
 .dtotal b{color:var(--tx); font-variant-numeric:tabular-nums}
 .pchk-plan.on{background:var(--accent); border-color:var(--accent)}
-.row.sub.is-paid .dc-n{text-decoration:line-through}
-.row.is-paid input.l{text-decoration:line-through; opacity:.6}
+.row.is-paid input.l{opacity:.6}
 .dlegend{font-size:11px; color:var(--tx3); line-height:1.45; margin:.15rem 0 .5rem}
 .dlegend b{color:var(--tx2)}
 /* Copia de seguridad (exportar / importar datos) */
@@ -1053,7 +1053,12 @@ function rowH(g,i,r){
   // por g-i — cosmético, se auto-cura al reindexar).
   const foldable=g!=='inc';
   const key=g+'-'+i;
-  const folded=foldable && (key in collapsed ? !!collapsed[key] : true); // por defecto PLEGADA: solo el monto
+  // Por defecto PLEGADA (solo el monto). EXCEPCIÓN: si tiene subcategorías PARCIALMENTE pagadas
+  // (algunas ✓, otras no) se abre sola para que veas cuál falta. Si todas o ninguna → plegada.
+  const someSubPaid=sub && d.itemPaid && r.sub.some((s,j)=>d.itemPaid[key+'-'+j]);
+  const allSubPaid=sub && r.sub.every((s,j)=>d.itemPaid&&d.itemPaid[key+'-'+j]);
+  const partial=!!(someSubPaid && !allSubPaid);
+  const folded=foldable && (key in collapsed ? !!collapsed[key] : !partial);
   let h='<div class="row'+(r.tj?' tjon':'')+(paid?' is-paid':'')+'">'+
     (foldable?'<button class="subtoggle" data-subfold="'+key+'" title="Plegar/desplegar subcategorías">'+(folded?'▸':'▾')+'</button>':'')+
     '<input class="l" data-grp="'+g+'" data-idx="'+i+'" data-f="l" value="'+esc(r.l)+'" placeholder="Categoría">'+
@@ -1077,7 +1082,7 @@ function bucketH(g,name,pct,num){
   const wizBtn=w?'<button class="wizgo" data-gostep="'+w[0]+'">'+w[1]+'</button>':'';
   const col=collapsed[g];
   return '<div class="sec sec-tint'+(col?' is-collapsed':'')+'" id="sec-'+g+'">'+
-    '<div class="sec-h tappable" data-collapse="'+g+'" title="Plegar/desplegar"><span class="tw"><span class="num num-'+g+'">'+num+'</span><span class="t">'+name+'</span></span><span class="sec-r"><span class="pct">'+Math.round(pct*100)+'%</span><span class="chev">'+(col?'▸':'▾')+'</span></span></div>'+
+    '<div class="sec-h tappable" data-collapse="'+g+'" title="Plegar/desplegar"><span class="chev">'+(col?'▸':'▾')+'</span><span class="num num-'+g+'">'+num+'</span><span class="t">'+name+' <span class="secpct">· '+Math.round(pct*100)+'%</span></span></div>'+
     (g==='aho'&&!col?'<div class="sec-note">Págate primero — esto sale antes de gastar.</div>':'')+
     '<div class="triad">'+
       '<span class="tr"><i>Presup.</i><b id="tg-'+g+'">&mdash;</b></span>'+
@@ -1402,7 +1407,14 @@ app.addEventListener('click',e=>{
   else if(b.dataset.deldebt!==undefined){snapshot();const i=+b.dataset.deldebt;const nm=debts[i]&&debts[i].n;debts.splice(i,1);if(nm&&d.debtPay)delete d.debtPay[nm];saveDebts();save();render();renderDebts();}
   else if(b.dataset.debtmode!==undefined){const nm=b.dataset.debtmode,mo=b.dataset.m;if(mo==='otro'&&!promptOtroMonto(nm))return;if(!d.debtPay)d.debtPay={};d.debtPay[nm]=mo;save();render();}
   else if(b.dataset.debtpaid!==undefined){toggleDebtPaid(b.dataset.debtpaid);}
-  else if(b.dataset.itempaid!==undefined){const k=b.dataset.itempaid;if(!d.itemPaid)d.itemPaid={};if(d.itemPaid[k])delete d.itemPaid[k];else d.itemPaid[k]=true;save();render();}
+  else if(b.dataset.itempaid!==undefined){const k=b.dataset.itempaid;if(!d.itemPaid)d.itemPaid={};
+    if(d.itemPaid[k])delete d.itemPaid[k];else d.itemPaid[k]=true;
+    // Si marqué una SUBcategoría (g-i-j): cuando TODAS las subs de la categoría quedan ✓, se marca
+    // sola la categoría padre; si desmarco una, se desmarca el padre.
+    const pp=k.split('-');
+    if(pp.length===3){const pk=pp[0]+'-'+pp[1], row=d[pp[0]]&&d[pp[0]][+pp[1]];
+      if(row&&hasSubs(row)){ if(row.sub.every((s,j)=>d.itemPaid[pk+'-'+j])) d.itemPaid[pk]=true; else delete d.itemPaid[pk]; }}
+    save();render();}
   else if(b.classList.contains('rm')){
     snapshot();
     const g=b.dataset.grp,i=+b.dataset.idx;
