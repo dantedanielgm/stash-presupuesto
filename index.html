@@ -1254,12 +1254,15 @@ function recompute(){
   poolNec-=resid; // lo que nadie pudo cubrir → único negativo, en necesidades
   const showLn=(id,txt,cls)=>{const e=document.getElementById(id);if(!e)return;e.innerHTML=txt||'';e.className=cls;e.style.display=txt?'':'none';};
   const setDisp=(g,v)=>{const e=document.getElementById('disp-'+g);if(e){e.textContent=pn(v);e.style.color=v<-0.5?'var(--bad)':(v>0.5?'var(--ok)':'var(--tx2)');}};
-  // Disponible = número REAL de cada caja (meta − gasto): SÍ muestra negativo si te pasaste ahí, para
-  // que lo veas y lo administres. Las notas de abajo cuentan a dónde se cubre. Utilizado queda = gasto
-  // propio (así meta − Utilizado = Disponible cuadra en cada fila).
+  // Disponible: la caja que SE PASÓ muestra su negativo (para verlo y administrarlo); la caja que
+  // ABSORBE el exceso muestra su número YA REDUCIDO por lo que cubrió (no el crudo). Ahorro nunca
+  // absorbe → su crudo. Gustos/Necesidades = crudo − lo que absorbieron. Utilizado = gasto + absorbido
+  // (así meta − Utilizado = Disponible cuadra por fila). Las notas cuentan qué cubrió cada una.
   setDisp('aho', rawAho);
-  setDisp('luj', rawLuj);
-  setDisp('nec', rawNec);
+  setDisp('luj', rawLuj-ahoToLuj-necToLuj);
+  setDisp('nec', rawNec-ahoToNec-lujToNec);
+  {const sm=document.getElementById('sm-luj'); if(sm)sm.textContent=pn((acts.luj||0)+ahoToLuj+necToLuj);}
+  {const sm=document.getElementById('sm-nec'); if(sm)sm.textContent=pn((acts.nec||0)+ahoToNec+lujToNec);}
   showLn('red-aho', cargaAho>0.5?'− '+pe(cargaAho)+' se arrastra a '+((ahoToNec>0.5||resid>0.5)?'gustos y necesidades':'gustos'):'', 'ln-red');
   showLn('mg-aho', '', 'ln-mg');
   const lujParts=[];
