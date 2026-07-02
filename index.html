@@ -409,7 +409,6 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .dtotal{font-size:12.5px; color:var(--tx2); margin-top:.7rem; padding-top:.55rem; border-top:1px solid var(--line2)}
 .dtotal b{color:var(--tx); font-variant-numeric:tabular-nums}
 .pchk-plan.on{background:var(--accent); border-color:var(--accent)}
-.pchk-paid.on{background:var(--ok); border-color:var(--ok)}
 .row.sub.is-paid .dc-n{text-decoration:line-through}
 .row.is-paid input.l{text-decoration:line-through; opacity:.6}
 .dlegend{font-size:11px; color:var(--tx3); line-height:1.45; margin:.15rem 0 .5rem}
@@ -613,16 +612,12 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .mc-tap:hover{background:var(--line2)}
 .mc-hint{font-size:9px; color:var(--accent); border:1px solid var(--accent); border-radius:10px; padding:0 .35rem; margin:.2rem auto 0; width:max-content}
 .tr-tap{cursor:pointer}
-/* Checks más visibles: borde marcado. El check "ya pagué" toma el COLOR DE SU CAJA (azul en
-   Necesidades, ámbar en Gustos, verde en Ahorro) — así se siente distinto del presupuesto y
-   queda coherente con la columna "Pagado" de esa caja. */
+/* Checks más visibles: borde marcado. El check "ya pagué" es SIEMPRE azul (accent), en
+   cualquier caja — un solo color para "esto es real/ejecutado", distinto del verde/ámbar
+   del presupuesto (así se distingue de un vistazo qué está pagado vs. qué es solo el plan). */
 .pcheck{border-color:var(--tx3)}
-.pchk-paid:not(.on){border-color:var(--ok)}
-.pchk-paid.on{background:var(--ok); border-color:var(--ok)}
-#sec-nec .pchk-paid:not(.on){border-color:var(--accent)}
-#sec-nec .pchk-paid.on{background:var(--accent); border-color:var(--accent)}
-#sec-luj .pchk-paid:not(.on){border-color:#e0922f}
-#sec-luj .pchk-paid.on{background:#e0922f; border-color:#e0922f}
+.pchk-paid:not(.on){border-color:var(--accent)}
+.pchk-paid.on{background:var(--accent); border-color:var(--accent)}
 /* En celular las 4 etiquetas caben sin recortarse */
 @media(max-width:420px){.macro .mc-l,.triad .tr i{font-size:8.5px; letter-spacing:0}}
 </style>
