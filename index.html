@@ -1254,12 +1254,12 @@ function recompute(){
   poolNec-=resid; // lo que nadie pudo cubrir → único negativo, en necesidades
   const showLn=(id,txt,cls)=>{const e=document.getElementById(id);if(!e)return;e.innerHTML=txt||'';e.className=cls;e.style.display=txt?'':'none';};
   const setDisp=(g,v)=>{const e=document.getElementById('disp-'+g);if(e){e.textContent=pn(v);e.style.color=v<-0.5?'var(--bad)':(v>0.5?'var(--ok)':'var(--tx2)');}};
-  setDisp('aho', Math.max(rawAho,0)); // su exceso ya se transfirió — no muestra negativo
-  setDisp('luj', poolLuj);            // nunca negativo: su exceso se fue a necesidades
-  setDisp('nec', poolNec);            // único que puede quedar negativo (déficit global)
-  // Utilizado mostrado = propio + lo absorbido (para que Presup − Utilizado = Disponible cuadre)
-  {const sm=document.getElementById('sm-luj'); if(sm)sm.textContent=pn((acts.luj||0)+ahoToLuj+necToLuj);}
-  {const sm=document.getElementById('sm-nec'); if(sm)sm.textContent=pn((acts.nec||0)+ahoToNec+lujToNec);}
+  // Disponible = número REAL de cada caja (meta − gasto): SÍ muestra negativo si te pasaste ahí, para
+  // que lo veas y lo administres. Las notas de abajo cuentan a dónde se cubre. Utilizado queda = gasto
+  // propio (así meta − Utilizado = Disponible cuadra en cada fila).
+  setDisp('aho', rawAho);
+  setDisp('luj', rawLuj);
+  setDisp('nec', rawNec);
   showLn('red-aho', cargaAho>0.5?'− '+pe(cargaAho)+' se arrastra a '+((ahoToNec>0.5||resid>0.5)?'gustos y necesidades':'gustos'):'', 'ln-red');
   showLn('mg-aho', '', 'ln-mg');
   const lujParts=[];
@@ -1399,6 +1399,11 @@ app.addEventListener('click',e=>{
     collapsed[k]=!curFolded; render(); return;}
   const df=e.target.closest('[data-deudafold]'); // encabezado "Deuda": pliega/despliega Préstamo + Tarjeta
   if(df){collapsed['deuda']=!collapsed['deuda'];render();return;}
+  const kfd=e.target.closest('[data-kindfold]'); // chevron de Préstamo/Tarjeta: pliega/despliega su detalle
+  if(kfd){const kind=kfd.dataset.kindfold, k='deuda-'+kind;
+    const list=Object.keys(d.debtPay||{}).filter(n=>{const x=debts.find(z=>z.n===n&&!z.auto);return x&&(kind==='card'?isCardDebt(x):isLoanDebt(x));}).map(n=>({n}));
+    const allPaid=list.length>0 && list.every(x=>d.paid&&d.paid[x.n]);
+    const cur=(k in collapsed)?!!collapsed[k]:allPaid; collapsed[k]=!cur; render(); return;}
   const dc=e.target.closest('[data-deudaclear]'); // × de "Deuda": quita del ciclo las deudas elegidas (reversible)
   if(dc){const sel=d.debtPay?Object.keys(d.debtPay):[]; if(!sel.length)return;
     if(confirm('¿Quitar las '+sel.length+' deuda(s) elegidas de este ciclo? Puedes volver a agregarlas del banco (o Deshacer).')){
@@ -1856,31 +1861,36 @@ function ahoDebtBlockH(){
     (folded?'':
       '<div class="dlegend">Toca <b>+</b> para elegir del banco qué pagar esta quincena. Marca el check <b>azul</b> cuando ya lo pagaste.</div>'+
       '<div class="subwrap">'+
-        kindHeaderH('loan','Préstamo',loans,sel)+
-        loans.map(x=>selectedDebtRowH(x,'loan')).join('')+
-        '<button class="add sub-add" data-openpicker="loan"><span class="p">+</span> Préstamo</button>'+
-        debtPickerH('loan')+
-        kindHeaderH('card','Tarjeta de crédito',cards,sel)+
-        cards.map(x=>selectedDebtRowH(x,'card')).join('')+
-        '<button class="add sub-add" data-openpicker="card"><span class="p">+</span> Tarjeta de crédito</button>'+
-        debtPickerH('card')+
+        kindGroupH('loan','Préstamo',loans,sel)+
+        kindGroupH('card','Tarjeta de crédito',cards,sel)+
         (planned>0?'<div class="dtotal">Pagas este ciclo: <b>'+pe(planned)+'</b>'+(paidS>0?' · ya pagaste <b>'+pe(paidS)+'</b> · falta <b>'+pe(planned-paidS)+'</b>':'')+' <span style="color:var(--tx3)">— sale de tu ahorro</span></div>':'')+
       '</div>'
     )+
   '</div>';
 }
-// Encabezado de grupo (Préstamo / Tarjeta de crédito) cohesionado con las filas: nombre + subtotal
-// del grupo en la columna del monto + check que marca/desmarca TODOS los de ese tipo (si hay elegidos).
-function kindHeaderH(kind,label,list,sel){
+// Estado plegado de un grupo (Préstamo/Tarjeta): por defecto PLEGADO si todos sus pagos ya están ✓
+// (esconde el detalle), DESPLEGADO si queda algo por pagar. Chevron permite override manual.
+function kindFolded(kind,list){const k='deuda-'+kind;
+  const allPaid=list.length>0 && list.every(x=>d.paid&&d.paid[x.n]);
+  return (k in collapsed) ? !!collapsed[k] : allPaid;}
+// Grupo Préstamo / Tarjeta: encabezado (chevron + nombre + subtotal + check-todos) + cuerpo plegable.
+function kindGroupH(kind,label,list,sel){
+  const folded=kindFolded(kind,list);
   const total=list.reduce((t,x)=>t+((d.paid&&d.paid[x.n]&&d.paidAmt&&d.paidAmt[x.n]!=null)?(parseFloat(d.paidAmt[x.n])||0):debtAmt(snapOf(x.n)||x,sel[x.n])),0);
   const allPaid=list.length>0 && list.every(x=>d.paid&&d.paid[x.n]);
-  return '<div class="row kind-row"'+(kind==='card'?' style="margin-top:.7rem"':'')+'>'+
+  const head='<div class="row kind-row"'+(kind==='card'?' style="margin-top:.7rem"':'')+'>'+
+    (list.length?'<button class="subtoggle" data-kindfold="'+kind+'">'+(folded?'▸':'▾')+'</button>':'')+
     '<span class="dsub-t kh-name">'+label+'</span>'+
     (list.length
       ? '<span class="a kh-total">'+pe(total)+'</span>'+
         '<button class="pcheck pchk-paid'+(allPaid?' on':'')+'" data-kindallpaid="'+kind+'" title="Marcar/desmarcar todos los '+(kind==='card'?'pagos de tarjeta':'préstamos')+'">'+(allPaid?'✓':'')+'</button>'
       : '')+
   '</div>';
+  const body=folded?'':
+    list.map(x=>selectedDebtRowH(x,kind)).join('')+
+    '<button class="add sub-add" data-openpicker="'+kind+'"><span class="p">+</span> '+label+'</button>'+
+    debtPickerH(kind);
+  return head+body;
 }
 /* ===== Simulador de tarjeteo ===== */
 const TJ_KEY='midas_tarjeteo';
