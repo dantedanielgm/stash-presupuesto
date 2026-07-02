@@ -600,12 +600,20 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 #sec-aho.sec-tint{background:rgba(52,199,89,.07); border-color:rgba(52,199,89,.32)}
 #sec-nec.sec-tint{background:rgba(0,113,227,.06); border-color:rgba(0,113,227,.28)}
 #sec-luj.sec-tint{background:rgba(224,146,47,.08); border-color:rgba(224,146,47,.32)}
-/* Macro y tríadas: Presupuestado · Utilizado · Disponible · Repartido · ✓ Pagado (5 columnas).
-   Los valores de estas celdas van SIN "S/" (pn(), no pe()) — el "S/" ya está grande arriba en el
-   hero; repetirlo 5 veces por fila no cabe a 375px y no suma información nueva. */
-.macro,.triad{grid-template-columns:repeat(5,1fr)}
+/* Tríada por caja: Presupuestado · Utilizado · Disponible · Repartido · ✓ Pagado (5 columnas).
+   El macro (arriba) NO repite Pagado como columna — vive aparte, en la insignia .macro-pagado:
+   es "¿ya lo ejecuté?", un tema distinto de "¿cómo reparto la plata?" (las 4 del macro), y el
+   detalle por categoría ya está en cada caja. Valores SIN "S/" (pn(), no pe()) — el "S/" ya está
+   grande arriba en el hero; repetirlo por celda no cabe a 375px y no suma información nueva. */
+.triad{grid-template-columns:repeat(5,1fr)}
+.macro{grid-template-columns:repeat(4,1fr)}
 .macro .mc-l{font-size:9.5px}
 .macro .mc-v{font-size:14px}
+.macro-row{display:flex; align-items:center; gap:.6rem}
+.macro-row .macro{flex:1; min-width:0}
+.macro-pagado{flex:none; display:flex; flex-direction:column; align-items:center; gap:.1rem; padding:.2rem .1rem 0; border-left:1px solid var(--line); padding-left:.6rem}
+.mp-v{font-size:13px; font-weight:800; color:var(--tx3); font-variant-numeric:tabular-nums}
+.mp-l{font-size:8px; color:var(--tx3); text-transform:uppercase; letter-spacing:.02em}
 .mc-tap{cursor:pointer; border-radius:8px; transition:background .15s; padding:.1rem 0}
 .mc-tap:hover{background:var(--line2)}
 .mc-hint{font-size:9px; color:var(--accent); border:1px solid var(--accent); border-radius:10px; padding:0 .35rem; margin:.2rem auto 0; width:max-content}
@@ -1126,12 +1134,14 @@ function render(){
       '</div>'+
     '</div>'+
     '<div class="heart macro-card" id="heart">'+
-      '<div class="macro">'+
-        '<div class="mc"><span class="mc-l">Presup.</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
-        '<div class="mc"><span class="mc-l">Utilizado</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
-        '<div class="mc"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span></div>'+
-        '<div class="mc mc-tap" data-macrodisp="1" title="Toca para elegir destino — cada toque rota entre las 3 opciones"><span class="mc-l">Repartido</span><span class="mc-v" style="color:var(--tx3)">&mdash;</span><span class="mc-hint" data-destinocycle="1">50/30/20</span></div>'+
-        '<div class="mc"><span class="mc-l">✓ Pagado</span><span class="mc-v" id="mc-done">&mdash;</span></div>'+
+      '<div class="macro-row">'+
+        '<div class="macro">'+
+          '<div class="mc"><span class="mc-l">Presup.</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
+          '<div class="mc"><span class="mc-l">Utilizado</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
+          '<div class="mc"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span></div>'+
+          '<div class="mc mc-tap" data-macrodisp="1" title="Toca para elegir destino — cada toque rota entre las 3 opciones"><span class="mc-l">Repartido</span><span class="mc-v" style="color:var(--tx3)">&mdash;</span><span class="mc-hint" data-destinocycle="1">50/30/20</span></div>'+
+        '</div>'+
+        '<div class="macro-pagado" title="Porcentaje pagado del total (el detalle vive en cada caja)"><span class="mp-v" id="mc-done">&mdash;</span><span class="mp-l">pagado</span></div>'+
       '</div>'+
       '<div id="macro-assign"></div>'+
     '</div>'+
