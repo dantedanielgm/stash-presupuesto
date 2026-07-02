@@ -266,6 +266,9 @@ body.focuson .ov-bar{display:none}
 .dg-fold .dd-name{flex:1; min-width:0; font-size:15px; font-weight:600; color:var(--tx); cursor:pointer; padding:.55rem .2rem}
 .dg-fold .dg-total{width:78px; flex:none; text-align:right; font-size:15px; font-weight:700; color:var(--tx); font-variant-numeric:tabular-nums; padding:.55rem .2rem}
 .dg-fold .pchk-sp{width:22px; flex:none}
+/* Encabezado de grupo Préstamo / Tarjeta: nombre + subtotal + check-todos, alineado con las filas */
+.kind-row .kh-name{flex:1; min-width:0; margin:0}
+.kind-row .kh-total{width:78px; flex:none; text-align:right; font-size:13px; font-weight:700; color:var(--tx2); font-variant-numeric:tabular-nums; padding:.35rem .2rem}
 .row.sub input.l,.row.sub input.a{font-size:13.5px; color:var(--tx2); padding-top:.45rem; padding-bottom:.45rem}
 .row.sub input.a{font-weight:500}
 .row.sub input:focus{color:var(--tx)}
@@ -1408,6 +1411,15 @@ app.addEventListener('click',e=>{
     sel.forEach(n=>{ if(allPaid){delete d.paid[n];delete d.paidAmt[n];}
       else {const s=snapOf(n)||debts.find(z=>z.n===n)||{}; d.paid[n]=true; d.paidAmt[n]=debtAmt(s,(d.debtPay[n])||'min');} });
     save(); if(typeof renderDebts==='function')renderDebts(); render(); return;}
+  const kap=e.target.closest('[data-kindallpaid]'); // check de Préstamo/Tarjeta: marca/desmarca los de ESE tipo
+  if(kap){const kind=kap.dataset.kindallpaid;
+    const sel=Object.keys(d.debtPay||{}).filter(n=>{const x=debts.find(z=>z.n===n&&!z.auto);return x&&(kind==='card'?isCardDebt(x):isLoanDebt(x));});
+    if(!sel.length)return;
+    const allPaid=sel.every(n=>d.paid&&d.paid[n]); snapshot();
+    if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={};
+    sel.forEach(n=>{ if(allPaid){delete d.paid[n];delete d.paidAmt[n];}
+      else {const s=snapOf(n)||debts.find(z=>z.n===n)||{}; d.paid[n]=true; d.paidAmt[n]=debtAmt(s,(d.debtPay[n])||'min');} });
+    save(); if(typeof renderDebts==='function')renderDebts(); render(); return;}
   const al=e.target.closest('[data-addline]');
   if(al){const i=+al.dataset.addline;tjOpen=null;view='inicio';collapsed.aho=false;pickerOpen='card';debtForm={kind:'card',idx:i};render();const s=document.getElementById('sec-aho');if(s)s.scrollIntoView({behavior:'smooth',block:'start'});return;}
   const b=e.target.closest('button');if(!b)return;
@@ -1844,17 +1856,30 @@ function ahoDebtBlockH(){
     (folded?'':
       '<div class="dlegend">Toca <b>+</b> para elegir del banco qué pagar esta quincena. Marca el check <b>azul</b> cuando ya lo pagaste.</div>'+
       '<div class="subwrap">'+
-        '<div class="dsub-t">Préstamo</div>'+
+        kindHeaderH('loan','Préstamo',loans,sel)+
         loans.map(x=>selectedDebtRowH(x,'loan')).join('')+
         '<button class="add sub-add" data-openpicker="loan"><span class="p">+</span> Préstamo</button>'+
         debtPickerH('loan')+
-        '<div class="dsub-t" style="margin-top:.7rem">Tarjeta de crédito</div>'+
+        kindHeaderH('card','Tarjeta de crédito',cards,sel)+
         cards.map(x=>selectedDebtRowH(x,'card')).join('')+
         '<button class="add sub-add" data-openpicker="card"><span class="p">+</span> Tarjeta de crédito</button>'+
         debtPickerH('card')+
         (planned>0?'<div class="dtotal">Pagas este ciclo: <b>'+pe(planned)+'</b>'+(paidS>0?' · ya pagaste <b>'+pe(paidS)+'</b> · falta <b>'+pe(planned-paidS)+'</b>':'')+' <span style="color:var(--tx3)">— sale de tu ahorro</span></div>':'')+
       '</div>'
     )+
+  '</div>';
+}
+// Encabezado de grupo (Préstamo / Tarjeta de crédito) cohesionado con las filas: nombre + subtotal
+// del grupo en la columna del monto + check que marca/desmarca TODOS los de ese tipo (si hay elegidos).
+function kindHeaderH(kind,label,list,sel){
+  const total=list.reduce((t,x)=>t+((d.paid&&d.paid[x.n]&&d.paidAmt&&d.paidAmt[x.n]!=null)?(parseFloat(d.paidAmt[x.n])||0):debtAmt(snapOf(x.n)||x,sel[x.n])),0);
+  const allPaid=list.length>0 && list.every(x=>d.paid&&d.paid[x.n]);
+  return '<div class="row kind-row"'+(kind==='card'?' style="margin-top:.7rem"':'')+'>'+
+    '<span class="dsub-t kh-name">'+label+'</span>'+
+    (list.length
+      ? '<span class="a kh-total">'+pe(total)+'</span>'+
+        '<button class="pcheck pchk-paid'+(allPaid?' on':'')+'" data-kindallpaid="'+kind+'" title="Marcar/desmarcar todos los '+(kind==='card'?'pagos de tarjeta':'préstamos')+'">'+(allPaid?'✓':'')+'</button>'
+      : '')+
   '</div>';
 }
 /* ===== Simulador de tarjeteo ===== */
