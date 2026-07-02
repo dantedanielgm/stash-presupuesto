@@ -1227,34 +1227,31 @@ function recompute(){
     bar.style.width=pctFill+'%';
     bar.style.background=(act>tgt)?'var(--bad)':'var(--ok)';
   });
-  // Cascada EN CADENA: el excedente de Ahorro (act−meta, incluye deuda) se arrastra a Gustos; si Gustos
-  // queda negativo, ESE déficit se arrastra a Necesidades. Cada caja: Utilizado = gasto propio + lo
-  // arrastrado; Disponible = meta − Utilizado. Líneas rojas dicen "− X se arrastra de excedente de …".
+  // Cascada por PRIORIDAD (proteger): Ahorro > Necesidades > Gustos. Gustos es el AMORTIGUADOR:
+  // absorbe tanto el excedente de Ahorro (ahorraste de más) como el exceso de Necesidades (te pasaste
+  // en un gasto esencial) — se recorta la diversión antes que el ahorro o las necesidades. Gustos es lo
+  // MENOS importante, así que su propio exceso NO se arrastra a nadie: es terminal (muestra su rojo).
   const overAho=Math.max((acts.aho||0)-(tgts.aho||0),0);
-  lastOver=overAho; // para decidir el orden del wizard (Gustos primero si hay exceso)
-  const showLn=(id,txt,cls)=>{const e=document.getElementById(id);if(!e)return;e.textContent=txt||'';e.className=cls;e.style.display=txt?'':'none';};
+  const overNec=Math.max((acts.nec||0)-(tgts.nec||0),0);
+  lastOver=overAho; // para decidir el orden del wizard
+  const showLn=(id,txt,cls)=>{const e=document.getElementById(id);if(!e)return;e.innerHTML=txt||'';e.className=cls;e.style.display=txt?'':'none';};
   const setDisp=(g,v)=>{const e=document.getElementById('disp-'+g);if(e){e.textContent=pn(v);e.style.color=v<-0.5?'var(--bad)':(v>0.5?'var(--ok)':'var(--tx2)');}};
-  setDisp('aho', (tgts.aho||0)-(acts.aho||0)); // ahorro: negativo si gastaste más del 20%
-  // Gustos absorbe el excedente de ahorro
-  const utilLuj=(acts.luj||0)+overAho, dispLuj=(tgts.luj||0)-utilLuj;
-  const overLuj=Math.max(-dispLuj,0); // déficit de gustos → se arrastra a necesidades
+  // Ahorro y Necesidades muestran su disponible propio (negativo si se pasaron); su exceso va a Gustos.
+  setDisp('aho', (tgts.aho||0)-(acts.aho||0));
+  setDisp('nec', (tgts.nec||0)-(acts.nec||0));
+  showLn('red-aho', overAho>0.5?'− '+pe(overAho)+' se arrastra a gustos':'', 'ln-red');
+  showLn('mg-aho', '', 'ln-mg');
+  showLn('red-nec', overNec>0.5?'− '+pe(overNec)+' se arrastra a gustos':'', 'ln-red');
+  showLn('mg-nec', '', 'ln-mg');
+  // Gustos absorbe overAho + overNec (Utilizado incluye lo arrastrado; Disponible = meta − Utilizado)
+  const utilLuj=(acts.luj||0)+overAho+overNec, dispLuj=(tgts.luj||0)-utilLuj;
   {const sm=document.getElementById('sm-luj'); if(sm)sm.textContent=pn(utilLuj);}
   setDisp('luj', dispLuj);
-  showLn('red-luj', overAho>0.5?'− '+pe(overAho)+' se arrastra de excedente de ahorro':'', 'ln-red');
+  const lujParts=[];
+  if(overAho>0.5) lujParts.push('− '+pe(overAho)+' se arrastra de exceso de ahorro');
+  if(overNec>0.5) lujParts.push('− '+pe(overNec)+' se arrastra de exceso de necesidades');
+  showLn('red-luj', lujParts.join('<br>'), 'ln-red');
   showLn('mg-luj', '', 'ln-mg');
-  // Necesidades absorbe el déficit de gustos
-  const utilNec=(acts.nec||0)+overLuj, dispNec=(tgts.nec||0)-utilNec;
-  {const sm=document.getElementById('sm-nec'); if(sm)sm.textContent=pn(utilNec);}
-  setDisp('nec', dispNec);
-  // Necesidades es la ÚLTIMA parada de la cadena (Ahorro → Gustos → Necesidades): si SE PASA POR SÍ
-  // SOLA (sin nada arrastrado de gustos), ese número YA es el final — no hay a dónde más mandarlo.
-  // Mandarlo "de vuelta" a Gustos duplicaría el déficit (rebotaría otra vez a Necesidades). Solo se
-  // aclara con una líneita propia para que no parezca un arrastre huérfano.
-  showLn('red-nec', overLuj>0.5?'− '+pe(overLuj)+' se arrastra de excedente de gustos'
-    : (dispNec<-0.5?'− '+pe(-dispNec)+' te pasaste de tu propia meta (no se arrastra a otra caja)':''), 'ln-red');
-  showLn('mg-nec', '', 'ln-mg');
-  showLn('red-aho', overAho>0.5?'− '+pe(overAho)+' se arrastra a gustos (y lo que sobre, a necesidades)':'', 'ln-red');
-  showLn('mg-aho', '', 'ln-mg');
   // Macro (arriba): Presupuestado (tu presupuesto total) / Utilizado (lo asignado, naranja) / Disponible (lo que queda).
   (function(){
     const p=document.getElementById('mc-pres'); if(p)p.textContent=pn(ti);
