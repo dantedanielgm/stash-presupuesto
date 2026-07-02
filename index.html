@@ -277,23 +277,6 @@ body.focuson .ov-bar{display:none}
   border:none; cursor:pointer; transition:color .15s}
 .reset:hover{color:var(--bad)}
 
-/* Asignar saldo libre — que la plata no quede en el aire */
-.assign{margin-top:1.1rem; background:var(--ok-bg); border-radius:var(--rad); padding:1.15rem 1.3rem}
-.assign-h{font-size:14px; font-weight:600; color:var(--tx); letter-spacing:-.01em}
-.assign-h b{font-variant-numeric:tabular-nums}
-.assign-sub{font-size:12.5px; color:var(--tx2); margin:.25rem 0 1rem}
-.assign-amt-wrap{display:flex; align-items:center; gap:.6rem; margin-bottom:.85rem}
-.assign-amt-wrap label{font-size:12.5px; color:var(--tx2); font-weight:500}
-#assign-amt{font:inherit; font-weight:600; font-variant-numeric:tabular-nums; width:120px; text-align:right;
-  background:var(--card); border:1px solid var(--line); border-radius:var(--rad-sm); padding:.5rem .6rem; color:var(--tx)}
-#assign-amt:focus{outline:none; border-color:var(--accent)}
-/* Burbujas de destino: mismo estilo que el chip "50/30/20" del macro — compactas, azules, las 3 iguales */
-.assign-bubbles{display:flex; gap:.5rem; margin-bottom:.9rem; flex-wrap:wrap}
-.ab-bub{font:inherit; font-size:13px; font-weight:600; color:var(--accent); background:transparent;
-  border:1px solid var(--accent); border-radius:14px; padding:.4rem .9rem; cursor:pointer; transition:.15s}
-.ab-bub:hover,.ab-bub.active{background:var(--accent); color:#fff}
-.assign-note{font-size:12px; color:var(--tx2); margin-top:.9rem; line-height:1.5}
-
 /* Módulo Deudas y tarjetas */
 .debts{margin-top:2.75rem; border-top:1px solid var(--line); padding-top:1.6rem}
 .debts h2{font-size:19px; font-weight:600; letter-spacing:-.015em; margin-bottom:.2rem}
@@ -614,11 +597,12 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .macro-pagado{flex:none; display:flex; flex-direction:column; align-items:center; gap:.1rem; padding:.2rem .1rem 0; border-left:1px solid var(--line); padding-left:.6rem}
 .mp-v{font-size:13px; font-weight:800; color:var(--tx3); font-variant-numeric:tabular-nums}
 .mp-l{font-size:8px; color:var(--tx3); text-transform:uppercase; letter-spacing:.02em}
-.mc-tap{cursor:pointer; border-radius:8px; transition:background .15s; padding:.1rem 0}
-.mc-tap:hover{background:var(--line2)}
-/* Señal de "esto se toca": mismo subrayado punteado que ya usa la app en #month/#payday —
-   lenguaje visual consistente para "campo interactivo", no un ícono nuevo que aprender. */
-.mc-tap .mc-v{border-bottom:1.5px dashed var(--accent); padding-bottom:1px}
+/* Chip "↻ 50/30/20" bajo Disponible: única acción sobre lo disponible — muestra/oculta el reparto
+   50/30/20 en la columna "Repartido" de cada caja. Píldora azul: contorno cuando está apagado,
+   relleno cuando está encendido (mismo lenguaje que los demás chips de la app). */
+.mc-rollchip{font:inherit; font-size:9px; font-weight:600; color:var(--accent); background:transparent;
+  border:1px solid var(--accent); border-radius:10px; padding:1px .4rem; margin:.25rem auto 0; cursor:pointer; width:max-content; transition:.15s}
+.mc-rollchip.on{background:var(--accent); color:#fff}
 .tr-tap{cursor:pointer}
 /* Checks más visibles: borde marcado. El check "ya pagué" es SIEMPRE azul (accent), en
    cualquier caja — un solo color para "esto es real/ejecutado", distinto del verde/ámbar
@@ -829,8 +813,6 @@ const WIZ=['sec-aho','sec-luj','sec-nec','planbox'];
 let wizStep=0;
 let showRollover=true; // por defecto ON: el reparto 50/30/20 (disponible por sector) se ve al abrir
 let lastSaldo=0; // último saldo libre calculado (para congelar el rollover)
-let abonoOpen=false; // true = panel de saldo libre muestra el selector de a qué deuda abonar
-let macroAssignOpen=false; // true = el panel "dale un destino" está abierto bajo el macro (se abre tocando el Disponible)
 let collapsed={aho:true,nec:true,luj:true,balance:true}; // al abrir: 3 cajas + balance colapsados
 let incEdit=false; // editar/agregar ingreso (oculto por defecto; el ingreso se ve grande arriba)
 let view='inicio'; // tab activo: inicio (las 3 cajas) | plan | deudas | informe
@@ -1135,11 +1117,12 @@ function render(){
         '<div class="macro">'+
           '<div class="mc"><span class="mc-l">Presup.</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
           '<div class="mc"><span class="mc-l">Utilizado</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
-          '<div class="mc mc-tap" data-macrodisp="1" title="Toca para elegir destino: repartir, deuda o reserva"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span></div>'+
+          '<div class="mc"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span>'+
+            '<button class="mc-rollchip'+(showRollover?' on':'')+'" data-toggleroll="1" title="Repartir lo disponible 50/30/20 en las 3 cajas">&#8635; 50/30/20</button>'+
+          '</div>'+
         '</div>'+
         '<div class="macro-pagado" title="Porcentaje pagado del total (el detalle vive en cada caja)"><span class="mp-v" id="mc-done">&mdash;</span><span class="mp-l">pagado</span></div>'+
       '</div>'+
-      '<div id="macro-assign"></div>'+
     '</div>'+
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
     '<div class="sec'+(collapsed.balance?' is-collapsed':'')+'" id="sec-balance">'+
@@ -1262,22 +1245,15 @@ function recompute(){
   const fn=document.getElementById('fondo-note');
   if(fn){ const real=(typeof ejecutadoSum==='function')?ejecutadoSum():0; const aRes=ti-real;
     fn.innerHTML='Al cerrar: gastaste <b>'+pe(real)+'</b> de verdad (lo marcado ✓). Lo no usado (<b>'+pe(aRes)+'</b>) lo mandas a tu <b>Fondo</b> o al siguiente ciclo — eliges al cerrar'+(aRes<-0.5?' <span style="color:var(--bad)">(gastaste más que tu ingreso)</span>':'')+'.'; }
-  // Rollover GUARDADO: muestra arriba de cada caja el monto disponible que quedó fijado
-  // al hacer el rollover (d.rollover). Persiste — no se recalcula en vivo.
-  // Rollover DINÁMICO: reparte el saldo libre ACTUAL en la columna "Repartido" de cada caja.
-  // Si pagas más deuda y baja el saldo, el número baja/desaparece solo. (Antes vivía en un banner
-  // aparte .rollbonus — se retiró: quedaba duplicado con esta columna.)
+  // Reparto 50/30/20: el chip "↻ 50/30/20" bajo Disponible enciende/apaga esto (showRollover).
+  // Reparte el saldo libre ACTUAL en la columna "Repartido" de cada caja. Es la ÚNICA acción sobre
+  // lo disponible — en envelope budgeting, disponible solo se asigna a los sobres. La deuda vive en
+  // Ahorro (su sección) y la reserva sale sola al Cerrar quincena; no son destinos aquí.
   const _ro={aho:0.2,nec:0.5,luj:0.3};
   ['aho','nec','luj'].forEach(g=>{
     const amt=showRollover?Math.max(saldo,0)*_ro[g]:0;
     const rp=document.getElementById('repto-'+g); if(rp)rp.textContent=amt>0.5?'+'+pn(amt):'—';
   });
-  // Panel "dale un destino" — vive bajo el macro, se abre tocando el Disponible de arriba.
-  const ma=document.getElementById('macro-assign');
-  if(ma) ma.innerHTML = macroAssignOpen
-    ? (saldo>0.5 ? assignPanelH(saldo,abonoOpen)
-       : '<div class="assign"><div class="assign-h">Sin saldo libre por ahora.</div><div class="assign-sub">Cuando quede disponible, aquí le das destino: repartir, reserva o abono.</div></div>')
-    : '';
   refreshPlan();
   if(typeof refreshAutoDebts==='function')refreshAutoDebts();
   if(typeof refreshInforme==='function')refreshInforme();
@@ -1293,29 +1269,6 @@ function recompute(){
       '<div class="sp-note">Regla popularizada por Elizabeth Warren (<i>All Your Worth</i>) — simple y sostenible. Y lo primero: <b>págate primero</b>, ahorrar antes de gastar (<i>El hombre más rico de Babilonia</i>).</div>'
     : '<div class="sp-note">Pon tu sueldo arriba y verás el reparto 50/30/20 al instante.</div>';
   if(typeof applyView==='function')applyView();
-}
-
-// Panel del saldo libre real — 3 destinos: Rollover (en vivo arriba de las cajas), Colchón, Abono.
-function assignPanelH(saldo,abOpen){
-  const v=Math.round(saldo);
-  let h='<div class="assign">'+
-    '<div class="assign-h">Te queda <b>'+pe(saldo)+'</b> de saldo libre real.</div>'+
-    '<div class="assign-sub">Dale un destino — claro: tanto para esto, tanto para lo otro.</div>'+
-    '<div class="assign-amt-wrap"><label>Monto a asignar</label>'+
-      '<input id="assign-amt" type="number" min="0" step="1" value="'+v+'"></div>'+
-    '<div class="assign-bubbles">'+
-      '<button class="ab-bub'+(showRollover?' active':'')+'" data-rollover="1" title="'+(showRollover?'Quitar el reparto':'Reparte 50/30/20 en las 3 cajas')+'">50/30/20</button>'+
-      '<button class="ab-bub'+(abOpen?' active':'')+'" data-abono="1" title="Abonar a una deuda">Deuda</button>'+
-      '<button class="ab-bub" data-assign="emer" title="Guardar en tu Reserva">Reserva</button>'+
-    '</div>';
-  if(abOpen){
-    const cards=debts.filter(x=>!x.auto&&(parseFloat(x.total)||0)>0);
-    h+='<div class="abono-pick"><div class="ap-h">¿A cuál deuda abonas <b>'+pe(v)+'</b>?</div>'+
-      (cards.length?cards.map((x,idx)=>{const i=debts.indexOf(x);return '<button class="ap-btn" data-abonopick="'+i+'"><span>'+esc(x.n)+'</span><span class="ap-deb">debes '+pe(x.total)+'</span></button>';}).join('')
-        :'<div class="ap-empty">No tienes deudas con saldo. 🎉</div>')+'</div>';
-  }
-  h+='<div class="assign-note">Págate primero. Lo que abones o guardes baja del saldo; lo que quede sigue libre.</div></div>';
-  return h;
 }
 
 // Cambiar / agregar ciclo (barra dinámica, delegado)
@@ -1366,8 +1319,8 @@ app.addEventListener('input',e=>{const t=e.target;
 app.addEventListener('click',e=>{
   const hdr=e.target.closest('.sec-h[data-collapse]'); // header acordeón: todo el encabezado pliega
   if(hdr){collapsed[hdr.dataset.collapse]=!collapsed[hdr.dataset.collapse];render();return;}
-  const md=e.target.closest('[data-macrodisp]'); // tocar el Disponible del macro abre/cierra "dale un destino"
-  if(md){macroAssignOpen=!macroAssignOpen;abonoOpen=false;recompute();return;}
+  const tr=e.target.closest('[data-toggleroll]'); // chip "↻ 50/30/20": muestra/oculta el reparto en las cajas
+  if(tr){showRollover=!showRollover;save();render();return;}
   const oc=e.target.closest('[data-openchecks]'); // tocar "✓ Pagado" abre la caja para ver los checks
   if(oc){const g=oc.dataset.openchecks;collapsed[g]=false;render();
     const s=document.getElementById('sec-'+g);if(s)s.scrollIntoView({behavior:'smooth',block:'start'});return;}
@@ -1386,22 +1339,6 @@ app.addEventListener('click',e=>{
     save();render();
   }
   else if(b.dataset.add){snapshot();d[b.dataset.add].push(b.dataset.add==='inc'?{l:'Nuevo ingreso',a:0}:{l:'Nueva categoría',a:0});save();render();}
-  else if(b.dataset.assign){
-    const amtEl=document.getElementById('assign-amt');
-    const amt=Math.round(parseFloat(amtEl&&amtEl.value)||0);
-    if(amt<=0)return;
-    snapshot();
-    const map={emer:['aho','Reserva'],inv:['aho','Inversión (largo plazo)'],lujo:['luj','Lujo consciente']};
-    const [g,label]=map[b.dataset.assign];
-    let cat=d[g].find(r=>r.l===label);
-    if(cat){
-      if(hasSubs(cat)){cat.sub.push({l:'Saldo asignado',a:amt});cat.a=sum(cat.sub);}
-      else{cat.a=(parseFloat(cat.a)||0)+amt;}
-    }else{
-      d[g].push({l:label,a:amt});
-    }
-    save();render();
-  }
   else if(b.dataset.tjt){const g=b.dataset.grp,i=+b.dataset.idx,sub=b.dataset.sub;const k=sub!==undefined?g+'-'+i+'-'+sub:g+'-'+i;tjOpen=(tjOpen===k)?null:k;render();}
   else if(b.dataset.tjpick!==undefined){snapshot();const g=b.dataset.grp,i=+b.dataset.idx,card=b.dataset.tjpick;
     const tgt=(b.dataset.sub!==undefined)?d[g][i].sub[+b.dataset.sub]:d[g][i];
@@ -1409,19 +1346,6 @@ app.addEventListener('click',e=>{
     else{tgt.tj=false;delete tgt.tjCard;delete tgt.tjCuotas;tjOpen=null;}
     save();render();}
   else if(b.dataset.gostep!==undefined){wizGo(+b.dataset.gostep);}
-  else if(b.dataset.rollover){abonoOpen=false;
-    if(!showRollover){ // ACTIVAR: congelar el reparto 50/30/20 del saldo y GUARDARLO
-      const s=Math.max(lastSaldo,0);
-      d.rollover={aho:Math.round(s*0.2),nec:Math.round(s*0.5),luj:Math.round(s*0.3),saldo:Math.round(s)};
-      showRollover=true;focusMode=false;view='inicio';
-    } else { delete d.rollover;showRollover=false; } // quitar: borra los montos guardados
-    delete d.showRollover; // limpiar bandera vieja
-    save();recompute();window.scrollTo({top:0,behavior:'smooth'});}
-  else if(b.dataset.abono){abonoOpen=!abonoOpen;recompute();}
-  else if(b.dataset.abonopick!==undefined){
-    const amtEl=document.getElementById('assign-amt');const amt=Math.round(parseFloat(amtEl&&amtEl.value)||0);
-    const i=+b.dataset.abonopick;if(amt>0&&debts[i]){snapshot();debts[i].total=Math.max((parseFloat(debts[i].total)||0)-amt,0);saveDebts();renderDebts();}
-    abonoOpen=false;recompute();}
   else if(b.dataset.focus!==undefined){focusGo(+b.dataset.focus);}
   else if(b.dataset.focustoggle){focusMode=!focusMode;focusStep=0;applyFocus();window.scrollTo({top:0,behavior:'smooth'});}
   else if(b.dataset.paid!==undefined){toggleDebtPaid(b.dataset.paid);}
