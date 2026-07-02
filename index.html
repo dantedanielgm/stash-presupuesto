@@ -258,10 +258,11 @@ body.focuson .ov-bar{display:none}
 /* Chevron para plegar/desplegar las subcategorías de una categoría (o Préstamo/Tarjeta dentro de Deuda) */
 .subtoggle{flex:none; width:20px; height:28px; border:none; background:transparent; color:var(--tx3); cursor:pointer; font-size:12px; line-height:1; padding:0; margin-right:-.2rem}
 .subtoggle:hover{color:var(--accent)}
-.dg-fold{display:flex; align-items:center; gap:.15rem; cursor:pointer; user-select:none}
-.dg-fold .subtoggle{height:auto}
-.dg-fold:hover{color:var(--accent)}
-.dg-total{margin-left:auto; font-size:13px; font-weight:700; color:var(--tx); font-variant-numeric:tabular-nums}
+/* "Deuda" como fila cohesionada con las categorías: mismas columnas que una .row */
+.dg-fold{user-select:none}
+.dg-fold .dd-name{flex:1; min-width:0; font-size:15px; font-weight:600; color:var(--tx); cursor:pointer; padding:.55rem .2rem}
+.dg-fold .dg-total{width:78px; flex:none; text-align:right; font-size:15px; font-weight:700; color:var(--tx); font-variant-numeric:tabular-nums; padding:.55rem .2rem}
+.dg-fold .pchk-sp{width:22px; flex:none}
 .row.sub input.l,.row.sub input.a{font-size:13.5px; color:var(--tx2); padding-top:.45rem; padding-bottom:.45rem}
 .row.sub input.a{font-weight:500}
 .row.sub input:focus{color:var(--tx)}
@@ -601,9 +602,13 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .macro,.triad{grid-template-columns:repeat(5,1fr)}
 .macro .mc-l{font-size:9.5px}
 .macro .mc-v{font-size:14px}
-.mc-rollchip{font:inherit; font-size:8.5px; font-weight:600; color:var(--accent); background:transparent;
-  border:1px solid var(--accent); border-radius:10px; padding:1px .3rem; margin:.15rem auto 0; cursor:pointer; width:max-content; max-width:100%; white-space:nowrap; transition:.15s}
-.mc-rollchip.on{background:var(--accent); color:#fff}
+/* Burbuja de reparto: llena su columna, 3 líneas ("Repartir / disponible / ↻ 50/30/20").
+   Apagada = gris (claro que es un botón, sin gritar). Encendida = toda la burbuja verde. */
+.mc-rollchip{display:block; width:100%; font:inherit; font-size:7.5px; font-weight:600; line-height:1.3; text-align:center;
+  color:var(--tx2); background:var(--line2); border:1px solid var(--line); border-radius:9px; padding:.28rem .1rem; cursor:pointer; transition:.15s}
+.mc-rollchip .mrc-r{font-size:8.5px; font-weight:700; white-space:nowrap}
+.mc-rollchip.on{background:var(--ok); border-color:var(--ok); color:#fff}
+.mc-roll{justify-content:center}
 .tr-tap{cursor:pointer}
 /* Checks más visibles: borde marcado. El check "ya pagué" es SIEMPRE azul (accent), en
    cualquier caja — un solo color para "esto es real/ejecutado", distinto del verde/ámbar
@@ -1004,7 +1009,7 @@ function subRowH(g,i,j,s){const canTj=(g==='nec'||g==='luj');
   '<input class="a" type="number" min="0" step="1" data-grp="'+g+'" data-idx="'+i+'" data-sub="'+j+'" data-f="a" value="'+s.a+'" placeholder="0">'+
   (canTj?'<button class="tjt'+(s.tj?' on':'')+'" data-tjt="1" data-grp="'+g+'" data-idx="'+i+'" data-sub="'+j+'" title="'+(s.tj?'En tarjeta: '+esc(s.tjCard||''):'Pagar con tarjeta')+'">'+TJ_SVG+'</button>':'')+
   '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" data-sub="'+j+'" aria-label="Eliminar">&times;</button>'+
-  (canTj?'<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'-'+j+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button>':'')+'</div>';
+  (g!=='inc'?'<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'-'+j+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button>':'')+'</div>';
   if(canTj && tjOpen===(g+'-'+i+'-'+j)) h+=tjPickerH(g,i,j,s);
   return h;}
 
@@ -1048,14 +1053,14 @@ function rowH(g,i,r){
   // por g-i — cosmético, se auto-cura al reindexar).
   const foldable=g!=='inc';
   const key=g+'-'+i;
-  const folded=foldable && (key in collapsed ? !!collapsed[key] : !sub);
+  const folded=foldable && (key in collapsed ? !!collapsed[key] : true); // por defecto PLEGADA: solo el monto
   let h='<div class="row'+(r.tj?' tjon':'')+(paid?' is-paid':'')+'">'+
     (foldable?'<button class="subtoggle" data-subfold="'+key+'" title="Plegar/desplegar subcategorías">'+(folded?'▸':'▾')+'</button>':'')+
     '<input class="l" data-grp="'+g+'" data-idx="'+i+'" data-f="l" value="'+esc(r.l)+'" placeholder="Categoría">'+
     '<input class="a" type="number" min="0" step="1" data-grp="'+g+'" data-idx="'+i+'" data-f="a" value="'+amt+'" placeholder="0"'+(sub?' readonly':'')+'>'+
     (canTj?'<button class="tjt'+(r.tj?' on':'')+'" data-tjt="1" data-grp="'+g+'" data-idx="'+i+'" title="'+(r.tj?'En tarjeta: '+esc(r.tjCard||''):'Pagar con tarjeta')+'">'+TJ_SVG+'</button>':'')+
     '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" aria-label="Eliminar">&times;</button>'+
-    (canTj?'<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button>':'')+'</div>';
+    (g!=='inc'?'<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'" title="Ya pagué esto">'+(paid?'✓':'')+'</button>':'')+'</div>';
   if(canTj && tjOpen===(g+'-'+i)) h+=tjPickerH(g,i,null,r);
   if(g!=='inc'){
     h+='<div class="subwrap"'+(folded?' style="display:none"':'')+'>';
@@ -1126,8 +1131,8 @@ function render(){
         '<div class="mc"><span class="mc-l">Presup.</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
         '<div class="mc"><span class="mc-l">Utilizado</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
         '<div class="mc"><span class="mc-l">Disponible</span><span class="mc-v" id="mc-disp">&mdash;</span></div>'+
-        '<div class="mc"><span class="mc-l">Repartido</span>'+
-          '<button class="mc-rollchip'+(showRollover?' on':'')+'" data-toggleroll="1" title="Repartir lo disponible 50/30/20 en las 3 cajas">&#8635; 50/30/20</button>'+
+        '<div class="mc mc-roll">'+
+          '<button class="mc-rollchip'+(showRollover?' on':'')+'" data-toggleroll="1" title="Repartir el disponible 50/30/20 en las 3 cajas">Repartir<br>disponible<br><span class="mrc-r">&#8635; 50/30/20</span></button>'+
         '</div>'+
         '<div class="mc"><span class="mc-l">&#10003; Pagado</span><span class="mc-v" id="mc-done">&mdash;</span></div>'+
       '</div>'+
@@ -1333,11 +1338,16 @@ app.addEventListener('click',e=>{
   if(oc){const g=oc.dataset.openchecks;collapsed[g]=false;render();
     const s=document.getElementById('sec-'+g);if(s)s.scrollIntoView({behavior:'smooth',block:'start'});return;}
   const sf=e.target.closest('[data-subfold]'); // chevron de categoría: pliega/despliega sus subcategorías
-  if(sf){const k=sf.dataset.subfold, p=k.split('-'), gg=p[0], ii=+p[1], rr=d[gg]&&d[gg][ii];
-    const curFolded=(k in collapsed)?!!collapsed[k]:!(rr&&hasSubs(rr)); // mismo default que rowH
+  if(sf){const k=sf.dataset.subfold;
+    const curFolded=(k in collapsed)?!!collapsed[k]:true; // mismo default que rowH: plegada
     collapsed[k]=!curFolded; render(); return;}
   const df=e.target.closest('[data-deudafold]'); // encabezado "Deuda": pliega/despliega Préstamo + Tarjeta
   if(df){collapsed['deuda']=!collapsed['deuda'];render();return;}
+  const dc=e.target.closest('[data-deudaclear]'); // × de "Deuda": quita del ciclo las deudas elegidas (reversible)
+  if(dc){const sel=d.debtPay?Object.keys(d.debtPay):[]; if(!sel.length)return;
+    if(confirm('¿Quitar las '+sel.length+' deuda(s) elegidas de este ciclo? Puedes volver a agregarlas del banco (o Deshacer).')){
+      snapshot(); d.debtPay={}; save(); render(); if(typeof renderDebts==='function')renderDebts();}
+    return;}
   const al=e.target.closest('[data-addline]');
   if(al){const i=+al.dataset.addline;tjOpen=null;view='inicio';collapsed.aho=false;pickerOpen='card';debtForm={kind:'card',idx:i};render();const s=document.getElementById('sec-aho');if(s)s.scrollIntoView({behavior:'smooth',block:'start'});return;}
   const b=e.target.closest('button');if(!b)return;
@@ -1675,11 +1685,11 @@ function toggleDebtPaid(name){
   }
   saveDebts(); save(); render(); if(typeof renderDebts==='function')renderDebts();
 }
-// Ejecutado/real POR CAJA: lo ya marcado como pagado. nec/luj = gastos en efectivo con ✓;
-// aho = pagos de deuda asentados (los checks de deuda viven en Ahorro).
+// Ejecutado/real POR CAJA: lo ya marcado como pagado. nec/luj/aho = categorías con ✓ (efectivo);
+// aho además suma los pagos de deuda asentados (los checks de deuda viven en Ahorro).
 function ejecutadoPorGrupo(){
   const r={aho:0,nec:0,luj:0};
-  ['nec','luj'].forEach(g=>{(d[g]||[]).forEach((row,i)=>{
+  ['aho','nec','luj'].forEach(g=>{(d[g]||[]).forEach((row,i)=>{
     const padre=!!(d.itemPaid&&d.itemPaid[g+'-'+i]); // marcar el padre cuenta toda la categoría
     if(hasSubs(row)){
       if(!row.tj) row.sub.forEach((s,j)=>{ if((padre||(d.itemPaid&&d.itemPaid[g+'-'+i+'-'+j]))&&!s.tj) r[g]+=parseFloat(s.a)||0; });
@@ -1734,11 +1744,16 @@ function ahoDebtBlockH(){
   const planned=debtPaySum();
   const paidS=(d.paid)?debts.filter(x=>!x.auto&&sel[x.n]&&d.paid[x.n]).reduce((t,x)=>t+debtAmt(x,sel[x.n]),0):0;
   const folded=!!collapsed['deuda'];
-  // "Deuda" se comporta como una categoría con subcategorías: chevron para plegar Préstamo/Tarjeta,
-  // y su total (lo que pagas este ciclo) a la derecha, siempre visible — como "Gastos fijos" en Necesidades.
+  // "Deuda" = fila cohesionada con las categorías de Ahorro: [chevron][Deuda][total en la columna del
+  // monto][× quitar deudas del ciclo][espacio del check]. Mismas posiciones que "Ahorro"/"Inversión".
   return '<div class="dgroup">'+
-    '<div class="dg-t dg-fold" data-deudafold="1" title="Plegar/desplegar deudas"><span class="subtoggle">'+(folded?'▸':'▾')+'</span>Deuda'+
-      (planned>0?'<span class="dg-total">'+pe(planned)+'</span>':'')+'</div>'+
+    '<div class="row dg-fold" title="Plegar/desplegar deudas">'+
+      '<button class="subtoggle" data-deudafold="1">'+(folded?'▸':'▾')+'</button>'+
+      '<span class="l dd-name" data-deudafold="1">Deuda</span>'+
+      '<span class="a dg-total">'+pe(planned)+'</span>'+
+      '<button class="rm" data-deudaclear="1" aria-label="Quitar deudas del ciclo" title="Quitar del ciclo las deudas elegidas">&times;</button>'+
+      '<span class="pchk-sp"></span>'+
+    '</div>'+
     (folded?'':
       '<div class="dlegend">Toca <b>+</b> para elegir del banco qué pagar esta quincena. Marca el check <b>azul</b> cuando ya lo pagaste.</div>'+
       '<div class="subwrap">'+
