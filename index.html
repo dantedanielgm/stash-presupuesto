@@ -478,6 +478,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .cta-row .cta-a{white-space:nowrap; font-size:13px; color:var(--tx2)}
 .cta-row .cta-a input{width:82px; font:inherit; font-size:14px; font-weight:600; text-align:right; color:var(--tx); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:.35rem .45rem}
 .cta-row .cta-a input:focus{outline:none; border-color:var(--accent)}
+.beta-tag{display:inline-block; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--accent); border:1px solid var(--accent); border-radius:5px; padding:0 .25rem; vertical-align:middle; opacity:.8}
 .ft-of{font-size:11.5px; color:var(--tx3); margin:-.2rem 0 .2rem}
 .ft-of b{color:var(--tx2)}
 .ft-of .neg{color:var(--bad)}
@@ -1253,7 +1254,7 @@ function commitCierre(){
 // Lista de cuentas en el Balance (mismo patrón que categorías: fila nombre+monto, edición en vivo).
 function cuentasH(){
   const has=cuentas.length>0;
-  let h='<div class="fondo-row"><span class="fondo-lbl">💳 En tus cuentas ahora<span class="fondo-hint">tu dinero real — agrega cada cuenta y su saldo, actualízalo cuando cambie</span></span>'+
+  let h='<div class="fondo-row"><span class="fondo-lbl">💳 En tus cuentas ahora <span class="beta-tag">beta</span><span class="fondo-hint">experimento — agrega cada cuenta y su saldo; el total se suma solo al editar</span></span>'+
     (has?'<span class="fondo-val" style="font-weight:700">S/ <span id="cta-total">'+pn(totalCuentas())+'</span></span>':'')+'</div>';
   if(has)h+='<div class="cta-list">'+cuentas.map((c,i)=>
     '<div class="cta-row"><input class="cta-n" data-cta="'+i+'" data-cf="n" value="'+esc(c.n||'')+'" placeholder="Ej. Interbank, BCP, Efectivo"><span class="cta-a">S/ <input data-cta="'+i+'" data-cf="a" type="number" min="0" step="1" value="'+(c.a!=null?c.a:'')+'" placeholder="0"></span><button class="ftc-rm" data-ctarm="'+i+'" aria-label="Quitar">&times;</button></div>').join('')+'</div>';
