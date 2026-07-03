@@ -467,6 +467,10 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .fondo-note b{color:var(--tx); font-variant-numeric:tabular-nums}
 .fondo-close{display:block; width:100%; margin-top:.85rem; font:inherit; font-size:13px; font-weight:600; color:#fff; background:var(--accent); border:none; border-radius:9px; padding:.6rem; cursor:pointer}
 .fondo-close:hover{filter:brightness(1.08)}
+/* Conciliación bancaria: "En tu cuenta ahora" + residuo (plata sin trabajo / fuga) */
+.banco-box{margin-top:1rem; background:var(--line2); border-radius:var(--rad-sm); padding:.9rem 1rem}
+.banco-cta{display:block; width:100%; margin-top:.6rem; font:inherit; font-size:12.5px; font-weight:700; color:#fff; background:var(--ok); border:none; border-radius:9px; padding:.55rem; cursor:pointer}
+.banco-cta:hover{filter:brightness(1.08)}
 /* Reserva: escalera de pisos (Colchón → Metas → Inversiones) + estado de cuenta del ciclo */
 .ft-piso{display:flex; align-items:center; gap:.45rem; font-size:13px; font-weight:700; color:var(--tx); margin:1.1rem 0 .4rem}
 .ft-piso .ft-hint{font-weight:400; display:inline; margin-left:.15rem}
@@ -720,6 +724,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 <div id="sec-fondo" class="sec" style="display:none"></div>
 <div id="sec-invertir" class="sec" style="display:none"></div>
 <div id="cierre-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="cierre-card"></div></div>
+<div id="wf-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="wf-card"></div></div>
 <!-- 3 tabs = el balance general: Inicio (flujo del ciclo) · Deudas (pasivos) · Reserva (activos).
      Invertir vive DENTRO de Reserva (piso 3 de la escalera); Resumen se fundió en Deudas. -->
 <nav class="tabbar">
@@ -1036,6 +1041,11 @@ let history=[];
 // Fondo / Reserva: ahorros pre-existentes. El resultado de cada quincena (sobró/faltó) suma o resta aquí.
 let fondo=parseFloat(localStorage.getItem('midas_fondo'))||0;
 function saveFondo(){localStorage.setItem('midas_fondo',String(fondo));}
+// Cuenta bancaria real (conciliación): UN número, actualizado a mano — local-first, sin banco conectado.
+// saldo real = comprometido sin pagar + libre presupuestado + RESIDUO. Residuo >0 = plata sin trabajo
+// (windfall); <0 = fuga (algo salió que no está en el plan). La Reserva vive aparte (no se cuenta aquí).
+let banco=localStorage.getItem('midas_banco'); banco=(banco===null||banco==='')?'':(parseFloat(banco)||0);
+function saveBanco(){localStorage.setItem('midas_banco',banco===''?'':String(banco));}
 // ===== Fondo (caja fuerte, aparte de los ciclos) con metas dentro =====
 function loadFondoCats(){try{const x=JSON.parse(localStorage.getItem('midas_fondo_cats'));return Array.isArray(x)?x:[];}catch(e){return [];}}
 let fondoCats=loadFondoCats();
@@ -1211,6 +1221,90 @@ function commitCierre(){
     else if(b.dataset.cidef){cierre.defTrato=b.dataset.cidef;renderCierre();}
     else if(b.dataset.cicancel){cierre=null;ov.hidden=true;}
     else if(b.dataset.cigo){commitCierre();}
+  });})();
+/* ===== Plata extra (windfall) — conciliación banco vs plan + escalera de decisión =====
+   La ciencia: (1) house money effect — la plata regalada/no asignada se gasta frívolo → cada sol
+   recibe trabajo YA (zero-based); (2) sobre-tope primero (multas + daño al historial); (3) victorias
+   COMPLETAS antes que abonos parciales (bola de nieve, Kellogg: matar una deuda entera sostiene la
+   conducta y libera su mínimo de TODOS los ciclos futuros); (4) el resto: colchón si está flaco
+   (evita volver a tarjetear en la próxima emergencia), si no, abono a la más urgente del ranking. */
+function bancoExtra(){ // null = sin saldo puesto · extra>0 plata sin trabajo · extra<0 fuga
+  if(banco==='')return null;
+  const ejec=(typeof ejecutadoSum==='function')?ejecutadoSum():0;
+  let util=0;buckets.forEach(b=>{const g=b[0];let a=(g==='nec'||g==='luj')?sumCash(d[g]):sum(d[g]);if(g==='aho')a+=debtPaySum();util+=a;});
+  const pendiente=Math.max(util-ejec,0), libre=Math.max(lastSaldo||0,0);
+  return {extra:(parseFloat(banco)||0)-pendiente-libre, pendiente, libre};
+}
+function windfallPlan(extra){
+  const props=[]; let resto=extra;
+  const vivas=debts.filter(x=>!x.auto&&(parseFloat(x.total)||0)>0);
+  // 1) urgencia absoluta: tarjeta SOBRE EL TOPE (multas + peor señal al historial)
+  vivas.filter(x=>isCardDebt(x)&&(parseFloat(x.limite)||0)>0&&(parseFloat(x.total)||0)>(parseFloat(x.limite)||0)+0.5).forEach(x=>{
+    if(resto<=0.5)return;
+    const total=parseFloat(x.total)||0, monto=Math.min(resto,total);
+    props.push({n:x.n,monto:Math.round(monto),ic:'🚨',why:monto>=total-0.5?'estaba SOBRE EL TOPE y la borras entera':'está SOBRE EL TOPE — bajarla corta multas y daño a tu historial'});
+    resto-=monto;
+  });
+  // 2) victorias completas: matar deudas ENTERAS, de la más chica a la más grande (bola de nieve)
+  vivas.filter(x=>!props.some(p=>p.n===x.n)).sort((a,b)=>(parseFloat(a.total)||0)-(parseFloat(b.total)||0)).forEach(x=>{
+    const total=parseFloat(x.total)||0;
+    if(total>0.5&&total<=resto+0.5){const lib=parseFloat(x.min)||0;
+      props.push({n:x.n,monto:Math.round(total),ic:'💥',why:'la matas ENTERA'+(lib>0?' y liberas '+pe(lib)+' de mínimo cada ciclo':'')});
+      resto-=total;}
+  });
+  // 3) el resto: colchón si está flaco (< medio mes de necesidades), si no abono a la más urgente
+  let colchon=0, abono=null;
+  if(resto>0.5){
+    const necMes=(cycleOf(activeQ).type==='q'?2:1)*sumCash(d.nec||[]);
+    const r1=(typeof advisorRank==='function')?advisorRank().filter(x=>!props.some(p=>p.n===x.n))[0]:null;
+    if(fondo<necMes*0.5||!r1){colchon=Math.round(resto);}
+    else{abono={n:r1.n,monto:Math.round(resto)};}
+    resto=0;
+  }
+  return {props,colchon,abono};
+}
+let wf=null; // {extra, plan}
+function openWindfall(){
+  const bx=bancoExtra(); if(!bx||bx.extra<=0.5)return;
+  wf={extra:Math.round(bx.extra),plan:windfallPlan(bx.extra)};
+  const el=document.getElementById('wf-card'); if(!el)return;
+  const p=wf.plan;
+  let h='<div class="ci-h">'+pe(wf.extra)+' sin trabajo ✨</div>'+
+    '<div class="ci-sub">En tu cuenta hay más de lo que tu plan explica. Cada sol necesita un trabajo — esta es la jugada, con la ciencia detrás:</div>';
+  if(p.props.length||p.abono||p.colchon>0){
+    h+='<div class="ci-sec">';
+    p.props.forEach(x=>{h+='<div class="ci-row"><span>'+x.ic+' <b>'+esc(x.n)+'</b><br><span style="font-size:11px;color:var(--tx3)">'+x.why+'</span></span><span class="cr-a">'+pe(x.monto)+'</span></div>';});
+    if(p.abono)h+='<div class="ci-row"><span>→ Abono a <b>'+esc(p.abono.n)+'</b><br><span style="font-size:11px;color:var(--tx3)">tu deuda más urgente del ranking</span></span><span class="cr-a">'+pe(p.abono.monto)+'</span></div>';
+    if(p.colchon>0)h+='<div class="ci-row"><span>🔒 <b>Colchón</b> (a tu Reserva)<br><span style="font-size:11px;color:var(--tx3)">'+(p.props.length||p.abono?'la semilla de tu red de emergencia':'tu colchón está flaco — esto evita volver a la tarjeta en la próxima emergencia')+'</span></span><span class="cr-a">'+pe(p.colchon)+'</span></div>';
+    h+='</div>'+
+      '<div class="ci-note">Al aplicar: sumo la plata a tu ingreso ("Plata extra"), dejo cada deuda con su monto listo — <b>págala en tu banco y márcale ✓</b> —, y el colchón entra como categoría en Ahorro: márcala ✓ cuando muevas la plata y viajará sola a tu Reserva.</div>';
+  } else {
+    h+='<div class="ci-q">No veo deudas ni huecos — mándalo a tu Reserva o dale un destino a mano.</div>';
+  }
+  h+='<div class="ci-btns"><button class="ci-cancel" data-wfcancel="1">Yo lo reparto a mano</button><button class="ci-go" data-wfgo="1">✓ Aplicar la jugada</button></div>';
+  el.innerHTML=h;
+  const ov=document.getElementById('wf-ovl'); if(ov)ov.hidden=false;
+}
+function applyWindfall(){
+  if(!wf)return;
+  snapshot();
+  d.inc.push({l:'Plata extra',a:wf.extra});
+  if(!d.debtPay)d.debtPay={}; if(!d.otroMonto)d.otroMonto={}; if(!d.debtSnap)d.debtSnap={};
+  const asigna=x=>{d.debtPay[x.n]='otro';d.otroMonto[x.n]=x.monto;
+    const dd=debts.find(z=>z.n===x.n); if(dd&&!d.debtSnap[x.n])d.debtSnap[x.n]=snapCapture(dd);};
+  wf.plan.props.forEach(asigna);
+  if(wf.plan.abono)asigna(wf.plan.abono);
+  if(wf.plan.colchon>0){
+    const row=(d.aho||[]).find(r=>/^colch[oó]n$/i.test((r.l||'').trim())&&!hasSubs(r));
+    if(row)row.a=(parseFloat(row.a)||0)+wf.plan.colchon; else d.aho.push({l:'Colchón',a:wf.plan.colchon});
+  }
+  wf=null; const ov=document.getElementById('wf-ovl'); if(ov)ov.hidden=true;
+  save();render();renderDebts();
+}
+(function(){const ov=document.getElementById('wf-ovl');if(!ov)return;
+  ov.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.wfcancel){wf=null;ov.hidden=true;}
+    else if(b.dataset.wfgo){applyWindfall();}
   });})();
 function snapshot(){history.push(JSON.stringify({d:d,debts:(typeof debts!=='undefined'?debts:[]),fondo:fondo}));if(history.length>50)history.shift();updateUndo();}
 function updateUndo(){const u=document.getElementById('undo');if(u)u.hidden=history.length===0;}
@@ -1390,6 +1484,11 @@ function render(){
           '<div class="bcard"><div class="lbl">Gasto total</div><div class="val" id="b-gas"></div></div>'+
           '<div class="bcard"><div class="lbl" id="b-sl-l">Saldo libre</div><div class="val" id="b-sl"></div></div>'+
         '</div>'+
+        '<div class="banco-box">'+
+          '<div class="fondo-row"><span class="fondo-lbl">💳 En tu cuenta ahora<span class="fondo-hint">tu saldo bancario real — actualízalo cuando cambie</span></span><span class="fondo-val">S/ <input id="banco-inp" type="number" min="0" step="1" value="'+banco+'" placeholder="0"></span></div>'+
+          '<div class="fondo-note" id="banco-rec"></div>'+
+          '<div id="banco-cta"></div>'+
+        '</div>'+
         '<div class="fondo-box">'+
           '<div class="fondo-note" id="fondo-note"></div>'+
           '<button class="fondo-close" data-cerrar="1">Cerrar quincena y pasar a la siguiente →</button>'+
@@ -1530,6 +1629,14 @@ function recompute(){
   const fn=document.getElementById('fondo-note');
   if(fn){ const real=(typeof ejecutadoSum==='function')?ejecutadoSum():0; const aRes=ti-real;
     fn.innerHTML='Al cerrar: gastaste <b>'+pe(real)+'</b> de verdad (lo marcado ✓). Lo no usado (<b>'+pe(aRes)+'</b>) lo mandas a tu <b>Reserva</b> o al siguiente ciclo — eliges al cerrar'+(aRes<-0.5?' <span style="color:var(--bad)">(gastaste más que tu ingreso — tu Reserva puede cubrirlo)</span>':'')+'.'; }
+  // Conciliación bancaria: ¿cada sol de tu cuenta tiene trabajo? (se actualiza en vivo, sin re-render)
+  const br=document.getElementById('banco-rec'), bc=document.getElementById('banco-cta');
+  if(br&&bc){ const bx=bancoExtra();
+    if(!bx){ br.innerHTML='Pon tu saldo real y te digo si cada sol tiene trabajo — y si te llegó plata extra, te armo la jugada.'; bc.innerHTML=''; }
+    else if(bx.extra>0.5){ br.innerHTML='Comprometido sin pagar <b>'+pe(bx.pendiente)+'</b> + libre <b>'+pe(bx.libre)+'</b> → hay <b style="color:var(--ok)">'+pe(bx.extra)+'</b> sin trabajo ✨';
+      bc.innerHTML='<button class="banco-cta" data-wfopen="1">Dale un trabajo a esos '+pe(bx.extra)+' →</button>'; }
+    else if(bx.extra<-0.5){ br.innerHTML='Tu plan necesita <b>'+pe(bx.pendiente+bx.libre)+'</b> pero en la cuenta hay <b style="color:var(--bad)">'+pe(parseFloat(banco)||0)+'</b> — faltan <b style="color:var(--bad)">'+pe(-bx.extra)+'</b>. ¿Salió algo que no registraste? Anótalo como gasto (o ajusta el plan).'; bc.innerHTML=''; }
+    else { br.innerHTML='✓ Tu cuenta cuadra con tu plan al centavo.'; bc.innerHTML=''; } }
   // Reparto 50/30/20: el chip "↻ 50/30/20" bajo Disponible enciende/apaga esto (showRollover).
   // Reparte el saldo libre ACTUAL en la columna "Repartido" de cada caja. Es la ÚNICA acción sobre
   // lo disponible — en envelope budgeting, disponible solo se asigna a los sobres. La deuda vive en
@@ -1576,6 +1683,7 @@ document.getElementById('cyclebar').addEventListener('input',e=>{const t=e.targe
 const app=document.getElementById('app');
 app.addEventListener('input',e=>{const t=e.target;
   if(t.id==='fondo-inp'){fondo=parseFloat(t.value)||0;saveFondo();recompute();return;}
+  if(t.id==='banco-inp'){banco=t.value===''?'':(parseFloat(t.value)||0);saveBanco();recompute();return;} // conciliación en vivo
   if(t.dataset&&t.dataset.loan!==undefined){const i=+t.dataset.loan,f=t.dataset.lf;if(debts[i]){debts[i][f]=t.value;saveDebts();recompute();}return;}
   if(t.dataset&&t.dataset.payday!==undefined){const yr=parseInt((t.value.split('-')[0])||'0',10);
     if(t.value && (yr<2000||yr>2100))return; // ignorar años absurdos hasta que la fecha esté completa
@@ -1691,6 +1799,7 @@ app.addEventListener('click',e=>{
   else if(b.dataset.deltpl!==undefined){const n=b.dataset.deltpl;if(confirm('¿Borrar la plantilla "'+n+'"?')){saveTpls(loadTemplates().filter(x=>x.name!==n));render();}}
   else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
   else if(b.dataset.cerrar){openCierre();}
+  else if(b.dataset.wfopen){openWindfall();}
   else if(b.dataset.gocierre){const id=b.dataset.gocierre;
     if(id!==activeQ)switchCycle(id);
     openCierre();} // la ceremonia ES la revisión (muestra lo pendiente); Cancelar te deja en el ciclo
