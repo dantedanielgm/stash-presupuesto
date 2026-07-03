@@ -481,6 +481,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .ftm-r b{font-variant-numeric:tabular-nums; white-space:nowrap}
 .ftm-r b.ok{color:var(--ok)}
 /* Ceremonia de cierre: modal de liquidación por caja (reemplaza los confirm() encadenados) */
+.cierre-ovl[hidden]{display:none} /* el atributo hidden GANA a la clase (si no, el modal se ve siempre) */
 .cierre-ovl{position:fixed; inset:0; z-index:90; background:rgba(0,0,0,.45); display:flex; align-items:flex-end; justify-content:center}
 .cierre-card{background:var(--card); border-radius:18px 18px 0 0; box-shadow:var(--shadow); width:100%; max-width:560px; max-height:88vh; overflow-y:auto; padding:1.1rem 1.15rem 1.3rem}
 @media(min-width:600px){.cierre-ovl{align-items:center; padding:1rem}.cierre-card{border-radius:18px}}
