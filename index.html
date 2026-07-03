@@ -1075,15 +1075,12 @@ function loadCuentas(){
 }
 let cuentas=loadCuentas();
 function saveCuentas(){localStorage.setItem('midas_cuentas',JSON.stringify(cuentas));}
-// DOS modos (decisión DD): 'total' = UN solo número con toda tu plata junta (default, lo más simple);
-// 'lista' = desglose por cuenta (Interbank, BCP…). Son excluyentes: cada modo tiene su propio dato.
-let bancoModo=localStorage.getItem('midas_banco_modo')||'total';
+// UN solo número: el dinero que tienes ahora (toda tu plata junta). Baja con cada ✓ que marcas.
 let bancoTotal=localStorage.getItem('midas_banco_total'); bancoTotal=(bancoTotal===null)?'':bancoTotal;
-if(bancoTotal===''&&cuentas.length){const s=cuentas.reduce((t,c)=>t+(parseFloat(c.a)||0),0);if(s>0)bancoTotal=String(s);} // arranque desde la suma vieja
-function saveBancoModo(){localStorage.setItem('midas_banco_modo',bancoModo);}
+if(bancoTotal===''&&cuentas.length){const s=cuentas.reduce((t,c)=>t+(parseFloat(c.a)||0),0);if(s>0)bancoTotal=String(s);} // arranque desde el dato viejo (suma de cuentas)
 function saveBancoTotal(){localStorage.setItem('midas_banco_total',bancoTotal===''?'':String(bancoTotal));}
-function totalCuentas(){return bancoModo==='lista'?cuentas.reduce((t,c)=>t+(parseFloat(c.a)||0),0):(parseFloat(bancoTotal)||0);}
-function hasCuentas(){return bancoModo==='lista'?cuentas.some(c=>c.a!==''&&c.a!=null&&!isNaN(parseFloat(c.a))):(bancoTotal!==''&&!isNaN(parseFloat(bancoTotal)));}
+function totalCuentas(){return parseFloat(bancoTotal)||0;}
+function hasCuentas(){return bancoTotal!==''&&!isNaN(parseFloat(bancoTotal));}
 // ===== Fondo (caja fuerte, aparte de los ciclos) con metas dentro =====
 function loadFondoCats(){try{const x=JSON.parse(localStorage.getItem('midas_fondo_cats'));return Array.isArray(x)?x:[];}catch(e){return [];}}
 let fondoCats=loadFondoCats();
@@ -1267,21 +1264,11 @@ function commitCierre(){
    COMPLETAS antes que abonos parciales (bola de nieve, Kellogg: matar una deuda entera sostiene la
    conducta y libera su mínimo de TODOS los ciclos futuros); (4) el resto: colchón si está flaco
    (evita volver a tarjetear en la próxima emergencia), si no, abono a la más urgente del ranking. */
-// Balance del dinero en dos modos: 'total' (un solo número con toda tu plata) o 'lista' (por cuenta).
+// UN solo espacio: el dinero que tienes ahora (toda tu plata junta). Baja con cada ✓ que marcas.
 function cuentasH(){
-  const has=hasCuentas(), pagado=has?saldoPagado():0, lista=bancoModo==='lista';
-  let h='<div class="fondo-row"><span class="fondo-lbl">💰 Cuánto tienes en total <span class="beta-tag">beta</span><span class="fondo-hint">toda tu plata junta (banco, alcancía, efectivo) — baja con cada pago que marcas ✓</span></span>'+
-    '<button class="cta-modo" data-ctamodo="1">'+(lista?'un solo total':'por cuenta')+'</button></div>';
-  if(lista){
-    // Desglose por cuenta: el total es la SUMA (solo lectura), cada cuenta editable.
-    h+=(has?'<div class="cta-bigtot">Tienes ahora: <b>S/ <span id="cta-total">'+pn(saldoVivo())+'</span></b></div>':'');
-    h+='<div class="cta-list">'+cuentas.map((c,i)=>
-      '<div class="cta-row"><input class="cta-n" data-cta="'+i+'" data-cf="n" value="'+esc(c.n||'')+'" placeholder="Ej. Interbank, BCP, Efectivo"><span class="cta-a">S/ <input data-cta="'+i+'" data-cf="a" type="number" min="0" step="1" value="'+(c.a!=null?c.a:'')+'" placeholder="0"></span><button class="ftc-rm" data-ctarm="'+i+'" aria-label="Quitar">&times;</button></div>').join('')+'</div>';
-    h+='<button class="add" data-ctaadd="1"><span class="p">+</span> Agregar cuenta</button>';
-  } else {
-    // Un solo total: UN número que tú tipeas y que baja solo con cada ✓ (se re-actualiza al marcar).
-    h+='<div class="cta-totalbox">S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"></div>';
-  }
+  const has=hasCuentas(), pagado=has?saldoPagado():0;
+  let h='<div class="fondo-row"><span class="fondo-lbl">💰 Dinero que tienes ahora<span class="fondo-hint">toda tu plata junta — baja con cada pago que marcas ✓</span></span></div>';
+  h+='<div class="cta-totalbox">S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"></div>';
   h+='<div class="cta-sub" id="cta-sub"'+(pagado>0.5?'':' style="display:none"')+'>de <b>'+pn(totalCuentas())+'</b> de arranque · ya pagaste <b>'+pn(pagado)+'</b></div>';
   return h;
 }
@@ -1756,11 +1743,7 @@ const app=document.getElementById('app');
 app.addEventListener('input',e=>{const t=e.target;
   if(t.id==='fondo-inp'){fondo=parseFloat(t.value)||0;saveFondo();recompute();return;}
   if(t.id==='banco-total-inp'){bancoTotal=t.value===''?'':(parseFloat(t.value)||0);saveBancoTotal();
-    d.bancoBase=ejecCash();save();recompute();return;} // modo total: el número que tipeas es tu total AHORA (re-ancla)
-  if(t.dataset&&t.dataset.cta!==undefined){const i=+t.dataset.cta; // edición en vivo de una cuenta (sin re-render)
-    if(cuentas[i]){cuentas[i][t.dataset.cf]=t.value;saveCuentas();
-      d.bancoBase=ejecCash();save(); // re-ancla: el saldo que tipeas es tu saldo real AHORA (no descuenta lo ya pagado)
-      const tot=document.getElementById('cta-total');if(tot)tot.textContent=pn(saldoVivo());recompute();}return;}
+    d.bancoBase=ejecCash();save();recompute();return;} // el número que tipeas es tu dinero AHORA (re-ancla)
   if(t.dataset&&t.dataset.loan!==undefined){const i=+t.dataset.loan,f=t.dataset.lf;if(debts[i]){debts[i][f]=t.value;saveDebts();recompute();}return;}
   if(t.dataset&&t.dataset.payday!==undefined){const yr=parseInt((t.value.split('-')[0])||'0',10);
     if(t.value && (yr<2000||yr>2100))return; // ignorar años absurdos hasta que la fecha esté completa
@@ -1877,14 +1860,6 @@ app.addEventListener('click',e=>{
   else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
   else if(b.dataset.cerrar){openCierre();}
   else if(b.dataset.wfopen){openWindfall();}
-  else if(b.dataset.ctaadd){cuentas.push({n:'',a:''});saveCuentas();render();
-    const inp=app.querySelector('input.cta-n[data-cta="'+(cuentas.length-1)+'"]');if(inp){inp.focus();inp.select();}}
-  else if(b.dataset.ctarm!==undefined){cuentas.splice(+b.dataset.ctarm,1);saveCuentas();render();}
-  else if(b.dataset.ctamodo){ // alternar "un solo total" ↔ "por cuenta", preservando el saldo VIVO actual
-    const vivo=hasCuentas()?Math.round(saldoVivo()):'';
-    if(bancoModo==='lista'){bancoTotal=vivo===''?'':String(vivo);bancoModo='total';}
-    else{cuentas=[{n:'',a:vivo}];bancoModo='lista';saveCuentas();}
-    saveBancoModo();saveBancoTotal();d.bancoBase=ejecCash();save();render();} // re-ancla: el saldo vivo pasa a ser el nuevo arranque
   else if(b.dataset.gocierre){const id=b.dataset.gocierre;
     if(id!==activeQ)switchCycle(id);
     openCierre();} // la ceremonia ES la revisión (muestra lo pendiente); Cancelar te deja en el ciclo
