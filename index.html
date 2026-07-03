@@ -471,6 +471,16 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .banco-box{margin-top:1rem; background:var(--line2); border-radius:var(--rad-sm); padding:.9rem 1rem}
 .banco-cta{display:block; width:100%; margin-top:.6rem; font:inherit; font-size:12.5px; font-weight:700; color:#fff; background:var(--ok); border:none; border-radius:9px; padding:.55rem; cursor:pointer}
 .banco-cta:hover{filter:brightness(1.08)}
+.cta-list{margin:.6rem 0 .2rem}
+.cta-row{display:flex; align-items:center; gap:.5rem; padding:.28rem 0}
+.cta-row .cta-n{flex:1; min-width:0; font:inherit; font-size:13px; color:var(--tx); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:.4rem .5rem}
+.cta-row .cta-n:focus{outline:none; border-color:var(--accent)}
+.cta-row .cta-a{white-space:nowrap; font-size:13px; color:var(--tx2)}
+.cta-row .cta-a input{width:82px; font:inherit; font-size:14px; font-weight:600; text-align:right; color:var(--tx); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:.35rem .45rem}
+.cta-row .cta-a input:focus{outline:none; border-color:var(--accent)}
+.ft-of{font-size:11.5px; color:var(--tx3); margin:-.2rem 0 .2rem}
+.ft-of b{color:var(--tx2)}
+.ft-of .neg{color:var(--bad)}
 /* Reserva: escalera de pisos (Colchón → Metas → Inversiones) + estado de cuenta del ciclo */
 .ft-piso{display:flex; align-items:center; gap:.45rem; font-size:13px; font-weight:700; color:var(--tx); margin:1.1rem 0 .4rem}
 .ft-piso .ft-hint{font-weight:400; display:inline; margin-left:.15rem}
@@ -1041,11 +1051,22 @@ let history=[];
 // Fondo / Reserva: ahorros pre-existentes. El resultado de cada quincena (sobró/faltó) suma o resta aquí.
 let fondo=parseFloat(localStorage.getItem('midas_fondo'))||0;
 function saveFondo(){localStorage.setItem('midas_fondo',String(fondo));}
-// Cuenta bancaria real (conciliación): UN número, actualizado a mano — local-first, sin banco conectado.
-// saldo real = comprometido sin pagar + libre presupuestado + RESIDUO. Residuo >0 = plata sin trabajo
-// (windfall); <0 = fuga (algo salió que no está en el plan). La Reserva vive aparte (no se cuenta aquí).
-let banco=localStorage.getItem('midas_banco'); banco=(banco===null||banco==='')?'':(parseFloat(banco)||0);
-function saveBanco(){localStorage.setItem('midas_banco',banco===''?'':String(banco));}
+// Cuentas bancarias reales (activos) — el ESPEJO de las tarjetas (pasivos). Una lista {nombre, monto},
+// actualizada a mano (local-first, sin banco conectado). La SUMA es tu dinero real, la fuente de verdad.
+// Conciliación (zero-based, "cada sol con un trabajo"):
+//   total cuentas = comprometido sin pagar + libre + RESERVA (apartado) + residuo
+// La Reserva NO es una pila aparte: es un APARTADO de este mismo dinero. Residuo >0 = plata sin trabajo
+// (windfall); <0 = fuga (algo salió que no está en el plan). Migra el número único viejo (midas_banco).
+function loadCuentas(){
+  try{const x=JSON.parse(localStorage.getItem('midas_cuentas'));if(Array.isArray(x))return x;}catch(e){}
+  const old=localStorage.getItem('midas_banco');
+  if(old!==null&&old!=='')return [{n:'Mi cuenta',a:parseFloat(old)||0}];
+  return [];
+}
+let cuentas=loadCuentas();
+function saveCuentas(){localStorage.setItem('midas_cuentas',JSON.stringify(cuentas));}
+function totalCuentas(){return cuentas.reduce((t,c)=>t+(parseFloat(c.a)||0),0);}
+function hasCuentas(){return cuentas.some(c=>c.a!==''&&c.a!=null&&!isNaN(parseFloat(c.a)));}
 // ===== Fondo (caja fuerte, aparte de los ciclos) con metas dentro =====
 function loadFondoCats(){try{const x=JSON.parse(localStorage.getItem('midas_fondo_cats'));return Array.isArray(x)?x:[];}catch(e){return [];}}
 let fondoCats=loadFondoCats();
@@ -1063,7 +1084,8 @@ function fondoH(){
   const movSum=movs.reduce((t,m)=>t+(m.a||0),0);
   return '<div class="sec-h"><span class="t">🔒 Reserva</span></div>'+
     '<div class="fondo-tab">'+
-      '<div class="ft-total"><span class="ft-l">Tu Reserva<span class="ft-hint">tu caja fuerte, aparte de los ciclos</span></span><span class="ft-v">S/ <input id="fondo-inp" type="number" min="0" step="1" value="'+fondo+'"></span></div>'+
+      '<div class="ft-total"><span class="ft-l">Tu Reserva<span class="ft-hint">un apartado de tu dinero — parte de tus cuentas que no gastas este ciclo</span></span><span class="ft-v">S/ <input id="fondo-inp" type="number" min="0" step="1" value="'+fondo+'"></span></div>'+
+      (hasCuentas()?'<div class="ft-of">de tus <b>'+pe(totalCuentas())+'</b> en cuentas'+(fondo>totalCuentas()+0.5?' — <span class="neg">reservaste más de lo que tienes</span>':'')+'</div>':'')+
       (movs.length?'<div class="ft-mov"><div class="ftm-h">Este ciclo: '+(movSum>=0?'+ ':'− ')+pe(Math.abs(movSum))+'</div>'+
         movs.slice(-6).reverse().map(m=>'<div class="ftm-r"><span>'+esc(m.n||'')+'</span><b class="'+((m.a||0)>=0?'ok':'neg')+'">'+((m.a||0)>=0?'+':'−')+' '+pe(Math.abs(m.a||0))+'</b></div>').join('')+'</div>'
         :'<div class="ft-mov"><div class="ftm-h">Este ciclo: sin movimientos aún</div><div class="ftm-r" style="color:var(--tx3)">Marca ✓ tu ahorro en Inicio y verás el aporte llegar aquí solo.</div></div>')+
@@ -1085,7 +1107,7 @@ function refreshSinAsignar(){ // actualiza el Colchón (piso 1) en vivo sin re-r
   if(l)l.innerHTML=pe(Math.max(sin,0))+(target>0?' de '+pe(target)+' <span style="color:var(--tx3)">(≈3 meses de tus necesidades)</span>':'')+(sin<-0.5?' — <span class="neg">asignaste a metas más de lo que tienes</span>':'');}
 (function(){const sf=document.getElementById('sec-fondo');if(!sf)return;
   sf.addEventListener('input',e=>{const t=e.target;
-    if(t.id==='fondo-inp'){fondo=parseFloat(t.value)||0;saveFondo();refreshSinAsignar();return;}
+    if(t.id==='fondo-inp'){fondo=parseFloat(t.value)||0;saveFondo();refreshSinAsignar();recompute();return;} // recompute: la Reserva es una reclamación del total → refresca la conciliación
     if(t.dataset&&t.dataset.ftc!==undefined){const i=+t.dataset.ftc;if(fondoCats[i]){fondoCats[i][t.dataset.ff]=t.value;saveFondoCats();if(t.dataset.ff==='a')refreshSinAsignar();}return;}
   });
   sf.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
@@ -1228,12 +1250,24 @@ function commitCierre(){
    COMPLETAS antes que abonos parciales (bola de nieve, Kellogg: matar una deuda entera sostiene la
    conducta y libera su mínimo de TODOS los ciclos futuros); (4) el resto: colchón si está flaco
    (evita volver a tarjetear en la próxima emergencia), si no, abono a la más urgente del ranking. */
-function bancoExtra(){ // null = sin saldo puesto · extra>0 plata sin trabajo · extra<0 fuga
-  if(banco==='')return null;
+// Lista de cuentas en el Balance (mismo patrón que categorías: fila nombre+monto, edición en vivo).
+function cuentasH(){
+  const has=cuentas.length>0;
+  let h='<div class="fondo-row"><span class="fondo-lbl">💳 En tus cuentas ahora<span class="fondo-hint">tu dinero real — agrega cada cuenta y su saldo, actualízalo cuando cambie</span></span>'+
+    (has?'<span class="fondo-val" style="font-weight:700">S/ <span id="cta-total">'+pn(totalCuentas())+'</span></span>':'')+'</div>';
+  if(has)h+='<div class="cta-list">'+cuentas.map((c,i)=>
+    '<div class="cta-row"><input class="cta-n" data-cta="'+i+'" data-cf="n" value="'+esc(c.n||'')+'" placeholder="Ej. Interbank, BCP, Efectivo"><span class="cta-a">S/ <input data-cta="'+i+'" data-cf="a" type="number" min="0" step="1" value="'+(c.a!=null?c.a:'')+'" placeholder="0"></span><button class="ftc-rm" data-ctarm="'+i+'" aria-label="Quitar">&times;</button></div>').join('')+'</div>';
+  h+='<button class="add" data-ctaadd="1"><span class="p">+</span> Agregar cuenta</button>';
+  h+='<div class="fondo-note" id="banco-rec"></div><div id="banco-cta"></div>';
+  return h;
+}
+function bancoExtra(){ // null = sin cuentas · extra>0 plata sin trabajo · extra<0 fuga
+  if(!hasCuentas())return null;
   const ejec=(typeof ejecutadoSum==='function')?ejecutadoSum():0;
   let util=0;buckets.forEach(b=>{const g=b[0];let a=(g==='nec'||g==='luj')?sumCash(d[g]):sum(d[g]);if(g==='aho')a+=debtPaySum();util+=a;});
-  const pendiente=Math.max(util-ejec,0), libre=Math.max(lastSaldo||0,0);
-  return {extra:(parseFloat(banco)||0)-pendiente-libre, pendiente, libre};
+  const pendiente=Math.max(util-ejec,0), libre=Math.max(lastSaldo||0,0), reserva=Math.max(fondo,0), total=totalCuentas();
+  // La Reserva es un apartado del MISMO dinero → es una cuarta reclamación sobre el total, no una pila aparte.
+  return {extra:total-pendiente-libre-reserva, pendiente, libre, reserva, total};
 }
 function windfallPlan(extra){
   const props=[]; let resto=extra;
@@ -1484,11 +1518,7 @@ function render(){
           '<div class="bcard"><div class="lbl">Gasto total</div><div class="val" id="b-gas"></div></div>'+
           '<div class="bcard"><div class="lbl" id="b-sl-l">Saldo libre</div><div class="val" id="b-sl"></div></div>'+
         '</div>'+
-        '<div class="banco-box">'+
-          '<div class="fondo-row"><span class="fondo-lbl">💳 En tu cuenta ahora<span class="fondo-hint">tu saldo bancario real — actualízalo cuando cambie</span></span><span class="fondo-val">S/ <input id="banco-inp" type="number" min="0" step="1" value="'+banco+'" placeholder="0"></span></div>'+
-          '<div class="fondo-note" id="banco-rec"></div>'+
-          '<div id="banco-cta"></div>'+
-        '</div>'+
+        '<div class="banco-box" id="banco-box">'+cuentasH()+'</div>'+
         '<div class="fondo-box">'+
           '<div class="fondo-note" id="fondo-note"></div>'+
           '<button class="fondo-close" data-cerrar="1">Cerrar quincena y pasar a la siguiente →</button>'+
@@ -1632,11 +1662,13 @@ function recompute(){
   // Conciliación bancaria: ¿cada sol de tu cuenta tiene trabajo? (se actualiza en vivo, sin re-render)
   const br=document.getElementById('banco-rec'), bc=document.getElementById('banco-cta');
   if(br&&bc){ const bx=bancoExtra();
-    if(!bx){ br.innerHTML='Pon tu saldo real y te digo si cada sol tiene trabajo — y si te llegó plata extra, te armo la jugada.'; bc.innerHTML=''; }
-    else if(bx.extra>0.5){ br.innerHTML='Comprometido sin pagar <b>'+pe(bx.pendiente)+'</b> + libre <b>'+pe(bx.libre)+'</b> → hay <b style="color:var(--ok)">'+pe(bx.extra)+'</b> sin trabajo ✨';
+    // Desglose: cada sol de tus cuentas cae en un cajón (comprometido / libre / reserva / sin trabajo).
+    const claim=bx?('Comprometido <b>'+pe(bx.pendiente)+'</b> · libre <b>'+pe(bx.libre)+'</b>'+(bx.reserva>0.5?' · reserva <b>'+pe(bx.reserva)+'</b>':'')):'';
+    if(!bx){ br.innerHTML='Agrega tus cuentas y su saldo — te digo si cada sol tiene trabajo, y si te llegó plata extra te armo la jugada.'; bc.innerHTML=''; }
+    else if(bx.extra>0.5){ br.innerHTML='De tus <b>'+pe(bx.total)+'</b>: '+claim+' → hay <b style="color:var(--ok)">'+pe(bx.extra)+'</b> sin trabajo ✨';
       bc.innerHTML='<button class="banco-cta" data-wfopen="1">Dale un trabajo a esos '+pe(bx.extra)+' →</button>'; }
-    else if(bx.extra<-0.5){ br.innerHTML='Tu plan necesita <b>'+pe(bx.pendiente+bx.libre)+'</b> pero en la cuenta hay <b style="color:var(--bad)">'+pe(parseFloat(banco)||0)+'</b> — faltan <b style="color:var(--bad)">'+pe(-bx.extra)+'</b>. ¿Salió algo que no registraste? Anótalo como gasto (o ajusta el plan).'; bc.innerHTML=''; }
-    else { br.innerHTML='✓ Tu cuenta cuadra con tu plan al centavo.'; bc.innerHTML=''; } }
+    else if(bx.extra<-0.5){ br.innerHTML='Tu plan reclama <b>'+pe(bx.pendiente+bx.libre+bx.reserva)+'</b> pero en tus cuentas hay <b style="color:var(--bad)">'+pe(bx.total)+'</b> — faltan <b style="color:var(--bad)">'+pe(-bx.extra)+'</b>. ¿Salió algo que no registraste, o reservaste de más? Anótalo como gasto (o ajusta).'; bc.innerHTML=''; }
+    else { br.innerHTML='✓ Cada sol de tus cuentas tiene trabajo — cuadra al centavo.'; bc.innerHTML=''; } }
   // Reparto 50/30/20: el chip "↻ 50/30/20" bajo Disponible enciende/apaga esto (showRollover).
   // Reparte el saldo libre ACTUAL en la columna "Repartido" de cada caja. Es la ÚNICA acción sobre
   // lo disponible — en envelope budgeting, disponible solo se asigna a los sobres. La deuda vive en
@@ -1683,7 +1715,9 @@ document.getElementById('cyclebar').addEventListener('input',e=>{const t=e.targe
 const app=document.getElementById('app');
 app.addEventListener('input',e=>{const t=e.target;
   if(t.id==='fondo-inp'){fondo=parseFloat(t.value)||0;saveFondo();recompute();return;}
-  if(t.id==='banco-inp'){banco=t.value===''?'':(parseFloat(t.value)||0);saveBanco();recompute();return;} // conciliación en vivo
+  if(t.dataset&&t.dataset.cta!==undefined){const i=+t.dataset.cta; // edición en vivo de una cuenta (sin re-render)
+    if(cuentas[i]){cuentas[i][t.dataset.cf]=t.value;saveCuentas();
+      const tot=document.getElementById('cta-total');if(tot)tot.textContent=pn(totalCuentas());recompute();}return;}
   if(t.dataset&&t.dataset.loan!==undefined){const i=+t.dataset.loan,f=t.dataset.lf;if(debts[i]){debts[i][f]=t.value;saveDebts();recompute();}return;}
   if(t.dataset&&t.dataset.payday!==undefined){const yr=parseInt((t.value.split('-')[0])||'0',10);
     if(t.value && (yr<2000||yr>2100))return; // ignorar años absurdos hasta que la fecha esté completa
@@ -1800,6 +1834,9 @@ app.addEventListener('click',e=>{
   else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
   else if(b.dataset.cerrar){openCierre();}
   else if(b.dataset.wfopen){openWindfall();}
+  else if(b.dataset.ctaadd){cuentas.push({n:'',a:''});saveCuentas();render();
+    const inp=app.querySelector('input.cta-n[data-cta="'+(cuentas.length-1)+'"]');if(inp){inp.focus();inp.select();}}
+  else if(b.dataset.ctarm!==undefined){cuentas.splice(+b.dataset.ctarm,1);saveCuentas();render();}
   else if(b.dataset.gocierre){const id=b.dataset.gocierre;
     if(id!==activeQ)switchCycle(id);
     openCierre();} // la ceremonia ES la revisión (muestra lo pendiente); Cancelar te deja en el ciclo
