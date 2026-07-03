@@ -154,6 +154,8 @@ body.focuson .reset{display:none}
 .plan-detail>summary::before{content:'▸ '; color:var(--tx3)}
 .plan-detail[open]>summary::before{content:'▾ '}
 .ln-red{font-size:12px; color:var(--bad); font-weight:600; line-height:1.45; margin-top:.35rem}
+.sec-in{margin:.15rem 0 .5rem}   /* movimiento que LLEGA: bajo el título, encima de la tríada */
+.sec-out{margin-top:.6rem}        /* movimiento que SALE + déficit: en la base de la caja */
 .ln-mg{font-size:12px; color:var(--accent); font-weight:600; line-height:1.45; margin-top:.25rem; text-decoration:underline dotted; text-underline-offset:3px}
 .ln-mg.neg{color:var(--bad); text-decoration:none}
 /* padding lateral = .9rem + 1px (el padding + borde de las cajas .sec-tint) para que las 5 columnas
@@ -1458,6 +1460,9 @@ function bucketH(g,name,pct,num){
   return '<div class="sec sec-tint'+(col?' is-collapsed':'')+'" id="sec-'+g+'">'+
     '<div class="sec-h tappable" data-collapse="'+g+'" title="Plegar/desplegar"><span class="chev">'+(col?'▸':'▾')+'</span><span class="num num-'+g+'">'+num+'</span><span class="t">'+name+' <span class="secpct">· '+Math.round(pct*100)+'%</span></span></div>'+
     (g==='aho'&&!col?'<div class="sec-note">Págate primero — esto sale antes de gastar.</div>':'')+
+    // Movimiento que LLEGA (− X cubre el exceso de…) → arriba, bajo el título, encima de la tríada.
+    // Solo en la vista desplegada (no en la compacta). El Disponible negativo ya cuenta la historia sola.
+    (col?'':'<div class="ln-red sec-in" id="in-'+g+'" style="display:none"></div>')+
     '<div class="triad">'+
       '<span class="tr"><i>Presup.</i><b id="tg-'+g+'">&mdash;</b></span>'+
       '<span class="tr"><i>Utilizado</i><b class="tr-util" id="sm-'+g+'">&mdash;</b></span>'+
@@ -1466,17 +1471,13 @@ function bucketH(g,name,pct,num){
       '<span class="tr tr-tap" data-openchecks="'+g+'" title="Ver qué falta pagar aquí"><i>✓ Pagado</i><b id="done-'+g+'">&mdash;</b></span>'+
     '</div>'+
     '<div class="bar"><div class="bar-fill" id="bar-'+g+'"></div></div>'+
-    // La historia de la cascada ("− X cubre el exceso" / "− X se arrastra a…") se ve SIEMPRE,
-    // aunque la caja esté plegada — es el punto de "el déficit busca liquidez", no debe esconderse.
-    '<div class="sec-lines">'+
-      '<div class="ln-red" id="red-'+g+'" style="display:none"></div>'+
-      '<div class="ln-mg" id="mg-'+g+'" style="display:none"></div>'+
-    '</div>'+
     '<div class="bucket-body"'+(col?' style="display:none"':'')+'>'+
       (g==='aho'?ahoDebtBlockH():'')+ // Deuda arriba → las categorías nuevas caen ABAJO (al final)
       rows+
       '<button class="add" data-add="'+g+'"><span class="p">+</span> Agregar categoría</button>'+ // también en Ahorro
     '</div>'+
+    // Movimiento que SALE (− X se arrastra a…) + déficit total → abajo, en la BASE. Solo desplegado.
+    (col?'':'<div class="ln-red sec-out" id="red-'+g+'" style="display:none"></div>')+
     wizBtn+'</div>';
 }
 
@@ -1629,22 +1630,19 @@ function recompute(){
   setDisp('nec', nNec);     // Necesidades: terminal — su negativo = déficit total (= Disponible macro)
   {const sm=document.getElementById('sm-luj'); if(sm)sm.textContent=pn((tgts.luj||0)-gLuj);}
   {const sm=document.getElementById('sm-nec'); if(sm)sm.textContent=pn((tgts.nec||0)-nNec);}
-  // Cadena limpia (modelo de DD): cada caja muestra el exceso ENTERO que le llega (no la parte que
-  // alcanza a cubrir con su presupuesto — de eso ya se encarga el negativo en Disponible), y cuánto
-  // de su propio negativo se arrastra a la siguiente. Ahorro → Gustos → Necesidades.
+  // Cadena limpia (modelo de DD): lo que LLEGA (cubre el exceso de…) va ARRIBA de cada caja (in-g);
+  // lo que SALE (se arrastra a…) + el déficit va ABAJO en la base (red-g). El exceso mostrado es el
+  // ENTERO que llega — el negativo en Disponible ya cuenta que la caja solo tenía parte para dar.
+  // Ahorro (fuente): solo saca. Gustos y Necesidades: reciben arriba, sacan/cierran abajo.
+  showLn('in-aho', '', 'ln-red');
   showLn('red-aho', excAho>0.5?'− '+pe(excAho)+' se arrastra a gustos':'', 'ln-red');
-  showLn('mg-aho', '', 'ln-mg');
-  const lujParts=[];
-  if(excAho>0.5) lujParts.push('− '+pe(excAho)+' cubre el exceso de ahorro');   // el exceso ENTERO que llega
-  if(necOnLuj>0.5) lujParts.push('− '+pe(necOnLuj)+' cubre el exceso de necesidades');
-  if(gNeg>0.5) lujParts.push('− '+pe(gNeg)+' se arrastra a necesidades');       // = su propio negativo en disponible
-  showLn('red-luj', lujParts.join('<br>'), 'ln-red');
-  showLn('mg-luj', '', 'ln-mg');
-  const necParts=[];
-  if(necOnLuj>0.5) necParts.push('− '+pe(necOnLuj)+' se arrastra a gustos');
-  if(gNeg>0.5) necParts.push('− '+pe(gNeg)+' cubre el exceso de gustos');       // recibe lo que Gustos no cubrió
-  if(nNec<-0.5) necParts.push('<b>Déficit total: al presupuesto le faltan '+pe(-nNec)+'</b>');
-  showLn('red-nec', necParts.join('<br>'), 'ln-red');
+  showLn('in-luj', excAho>0.5?'− '+pe(excAho)+' cubre el exceso de ahorro':(necOnLuj>0.5?'− '+pe(necOnLuj)+' cubre el exceso de necesidades':''), 'ln-red');
+  showLn('red-luj', gNeg>0.5?'− '+pe(gNeg)+' se arrastra a necesidades':'', 'ln-red');
+  const necOut=[];
+  if(necOnLuj>0.5) necOut.push('− '+pe(necOnLuj)+' se arrastra a gustos');
+  if(nNec<-0.5) necOut.push('<b>Déficit total: al presupuesto le faltan '+pe(-nNec)+'</b>');
+  showLn('in-nec', gNeg>0.5?'− '+pe(gNeg)+' cubre el exceso de gustos':'', 'ln-red');
+  showLn('red-nec', necOut.join('<br>'), 'ln-red');
   showLn('mg-nec', '', 'ln-mg');
   // Macro (arriba): Presupuestado (tu presupuesto total) / Utilizado (lo asignado, naranja) / Disponible (lo que queda).
   (function(){
