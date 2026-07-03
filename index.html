@@ -1629,17 +1629,20 @@ function recompute(){
   setDisp('nec', nNec);     // Necesidades: terminal — su negativo = déficit total (= Disponible macro)
   {const sm=document.getElementById('sm-luj'); if(sm)sm.textContent=pn((tgts.luj||0)-gLuj);}
   {const sm=document.getElementById('sm-nec'); if(sm)sm.textContent=pn((tgts.nec||0)-nNec);}
-  showLn('red-aho', excAho>0.5?'− '+pe(excAho)+' se arrastra a '+(gNeg>0.5?'gustos y necesidades':'gustos'):'', 'ln-red');
+  // Cadena limpia (modelo de DD): cada caja muestra el exceso ENTERO que le llega (no la parte que
+  // alcanza a cubrir con su presupuesto — de eso ya se encarga el negativo en Disponible), y cuánto
+  // de su propio negativo se arrastra a la siguiente. Ahorro → Gustos → Necesidades.
+  showLn('red-aho', excAho>0.5?'− '+pe(excAho)+' se arrastra a gustos':'', 'ln-red');
   showLn('mg-aho', '', 'ln-mg');
   const lujParts=[];
-  if(ahoOnLuj>0.5) lujParts.push('− '+pe(ahoOnLuj)+' cubre el exceso de ahorro');
+  if(excAho>0.5) lujParts.push('− '+pe(excAho)+' cubre el exceso de ahorro');   // el exceso ENTERO que llega
   if(necOnLuj>0.5) lujParts.push('− '+pe(necOnLuj)+' cubre el exceso de necesidades');
-  if(gNeg>0.5) lujParts.push('− '+pe(gNeg)+' se arrastra a necesidades');
+  if(gNeg>0.5) lujParts.push('− '+pe(gNeg)+' se arrastra a necesidades');       // = su propio negativo en disponible
   showLn('red-luj', lujParts.join('<br>'), 'ln-red');
   showLn('mg-luj', '', 'ln-mg');
   const necParts=[];
   if(necOnLuj>0.5) necParts.push('− '+pe(necOnLuj)+' se arrastra a gustos');
-  if(gNeg>0.5) necParts.push('− '+pe(gNeg)+' se arrastra desde gustos');
+  if(gNeg>0.5) necParts.push('− '+pe(gNeg)+' cubre el exceso de gustos');       // recibe lo que Gustos no cubrió
   if(nNec<-0.5) necParts.push('<b>Déficit total: al presupuesto le faltan '+pe(-nNec)+'</b>');
   showLn('red-nec', necParts.join('<br>'), 'ln-red');
   showLn('mg-nec', '', 'ln-mg');
