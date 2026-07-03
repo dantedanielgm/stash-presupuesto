@@ -1513,11 +1513,6 @@ function render(){
     '<div class="sec'+(collapsed.balance?' is-collapsed':'')+'" id="sec-balance">'+
       '<div class="sec-h tappable" data-collapse="balance" title="Balance"><span class="tw"><span class="t" style="font-size:14px">Balance</span></span><span class="sec-r"><span class="chev">'+(collapsed.balance?'▸':'▾')+'</span></span></div>'+
       '<div class="bucket-body"'+(collapsed.balance?' style="display:none"':'')+'>'+
-        '<div class="grid sm">'+
-          '<div class="bcard"><div class="lbl">Ingreso</div><div class="val" id="b-inc"></div></div>'+
-          '<div class="bcard"><div class="lbl">Gasto total</div><div class="val" id="b-gas"></div></div>'+
-          '<div class="bcard"><div class="lbl" id="b-sl-l">Saldo libre</div><div class="val" id="b-sl"></div></div>'+
-        '</div>'+
         '<div class="banco-box" id="banco-box">'+cuentasH()+'</div>'+
         '<div class="fondo-box">'+
           '<div class="fondo-note" id="fondo-note"></div>'+
@@ -1650,12 +1645,12 @@ function recompute(){
       } else { bar.style.display='none'; lbl.style.display='none'; }
     }
   })();
-  document.getElementById('b-gas').textContent=pe(gas);
-  const saldo=ti-gas,sl=document.getElementById('b-sl');
-  lastSaldo=saldo; // para el snapshot del rollover
-  sl.textContent=pe(saldo);
-  sl.style.color=saldo>=0?'var(--ok)':'var(--bad)';
-  document.getElementById('b-sl-l').textContent=saldo>=0?'Saldo libre':'Déficit';
+  const saldo=ti-gas;
+  lastSaldo=saldo; // se sigue calculando (lo usa la conciliación como "libre"), aunque ya no se muestre
+  // (las tarjetas Ingreso/Gasto/Saldo libre se quitaron — el Balance ahora es solo "En tus cuentas")
+  {const bg=document.getElementById('b-gas');if(bg)bg.textContent=pe(gas);
+   const sl=document.getElementById('b-sl');if(sl){sl.textContent=pe(saldo);sl.style.color=saldo>=0?'var(--ok)':'var(--bad)';}
+   const sll=document.getElementById('b-sl-l');if(sll)sll.textContent=saldo>=0?'Saldo libre':'Déficit';}
   const fn=document.getElementById('fondo-note');
   if(fn){ const real=(typeof ejecutadoSum==='function')?ejecutadoSum():0; const aRes=ti-real;
     fn.innerHTML='Al cerrar: gastaste <b>'+pe(real)+'</b> de verdad (lo marcado ✓). Lo no usado (<b>'+pe(aRes)+'</b>) lo mandas a tu <b>Reserva</b> o al siguiente ciclo — eliges al cerrar'+(aRes<-0.5?' <span style="color:var(--bad)">(gastaste más que tu ingreso — tu Reserva puede cubrirlo)</span>':'')+'.'; }
