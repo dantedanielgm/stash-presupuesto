@@ -1959,14 +1959,26 @@ app.addEventListener('click',e=>{
   else if(b.dataset.debtmode!==undefined){const nm=b.dataset.debtmode,mo=b.dataset.m;if(mo==='otro'&&!promptOtroMonto(nm))return;if(!d.debtPay)d.debtPay={};d.debtPay[nm]=mo;save();render();}
   else if(b.dataset.debtpaid!==undefined){toggleDebtPaid(b.dataset.debtpaid);}
   else if(b.dataset.itempaid!==undefined){const k=b.dataset.itempaid;if(!d.itemPaid)d.itemPaid={};
-    // ✓ = "esta plata SALIÓ" y nada más (modelo DD). NO va sola a la Reserva: en Ahorro puede ser
-    // una deuda a alguien (CumpleFania) — esa plata desaparece. La Reserva solo crece cuando TÚ lo
-    // dices: editándola arriba o respondiendo "sí lo aparté" en el cierre.
-    if(k.indexOf('aho-')===0 && d.itemPaid[k]){
-      // destildando algo que SÍ había viajado a la Reserva (cierre o versión vieja) → la devuelve exacto
-      const amt=(d.ahoMoved&&d.ahoMoved[k])||0;
-      if(amt>0.5){snapshot();fondo-=amt;saveFondo();addResLog(-amt,ahoKeyLabel(k)+' · deshecho');}
-      if(d.ahoMoved)delete d.ahoMoved[k];
+    // ✓ en categoría libre de AHORRO: la plata SALIÓ de tus cuentas sí o sí (baja el contador vivo),
+    // pero la caja no puede adivinar A DÓNDE — Ahorro alberga los 4 inquilinos del 20 (deuda a alguien
+    // se ESFUMA; pagarte a ti se MUDA a la Reserva, tu alcancía aparte). Decisión DD (5 jul): preguntar
+    // al marcar, dos botones. El grupo Deuda (Préstamo/Tarjeta) nunca pregunta: eso siempre se va.
+    if(k.indexOf('aho-')===0){
+      if(!d.itemPaid[k]){ // marcando
+        const amt=ahoKeyAmount(k);
+        if(amt>0.5){
+          const guarda=confirm('✓ '+ahoKeyLabel(k)+' — S/ '+Math.round(amt)+'\n\n¿Dónde quedó esta plata?\n\nACEPTAR → En mi Reserva (me la guardé yo)\nCANCELAR → Se fue (pagué una deuda o a alguien)');
+          if(guarda){
+            snapshot();
+            if(!d.ahoMoved)d.ahoMoved={}; d.ahoMoved[k]=amt;
+            fondo+=amt; saveFondo(); addResLog(amt,ahoKeyLabel(k));
+          }
+        }
+      } else { // destildando → si había viajado a la Reserva, la devuelve exacto; si se fue, solo revierte el check
+        const amt=(d.ahoMoved&&d.ahoMoved[k])||0;
+        if(amt>0.5){snapshot();fondo-=amt;saveFondo();addResLog(-amt,ahoKeyLabel(k)+' · deshecho');}
+        if(d.ahoMoved)delete d.ahoMoved[k];
+      }
     }
     cashDelta(()=>{ // el toggle (y su cascada padre/subs) ajusta "Dinero que tienes ahora" al instante
       if(d.itemPaid[k])delete d.itemPaid[k];else d.itemPaid[k]=true;
