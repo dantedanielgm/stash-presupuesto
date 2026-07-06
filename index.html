@@ -547,6 +547,13 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .wf-opt:hover{border-color:var(--accent)}
 .wf-opt b{display:block; font-size:13px; color:var(--tx); font-weight:700}
 .wf-opt span{display:block; font-size:11px; color:var(--tx3); margin-top:.1rem}
+/* ¿Se pagó o a Reserva? — dos botones claros al marcar ✓ en una categoría creada de Ahorro */
+.aho-opts{display:flex; gap:.6rem; margin:.5rem 0 .8rem}
+.aho-opt{flex:1; font:inherit; border:1.5px solid var(--line); background:transparent; border-radius:12px; padding:.9rem .6rem; cursor:pointer; text-align:center}
+.aho-opt:hover,.aho-opt:active{border-color:var(--accent); background:var(--ok-bg)}
+.aho-opt b{display:block; font-size:14px; color:var(--tx); font-weight:700}
+.aho-opt span{display:block; font-size:11px; color:var(--tx3); margin-top:.25rem; line-height:1.3}
+.aho-cancel{display:block; width:100%; text-align:center}
 /* Modo reparto ("a un lugar específico"): banner + botón +S/ en cada categoría */
 .asigna-banner{position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; background:var(--accent); color:#fff; border-radius:var(--rad-sm); padding:.6rem .85rem; margin:.4rem 0 .2rem; font-size:12.5px; font-weight:600; box-shadow:var(--shadow)}
 .asigna-banner b{font-variant-numeric:tabular-nums}
@@ -762,6 +769,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 <div id="sec-invertir" class="sec" style="display:none"></div>
 <div id="cierre-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="cierre-card"></div></div>
 <div id="wf-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="wf-card"></div></div>
+<div id="aho-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="aho-card"></div></div>
 <!-- 3 tabs = el balance general: Inicio (flujo del ciclo) · Deudas (pasivos) · Reserva (activos).
      Invertir vive DENTRO de Reserva (piso 3 de la escalera); Resumen se fundió en Deudas. -->
 <nav class="tabbar">
@@ -1343,6 +1351,44 @@ function windfallPlan(extra){
   return {props,colchon,abono};
 }
 let wf=null; // {extra, plan}
+// Aplica el toggle del ✓ (categoría o subcategoría) + la cascada padre/subs, ajustando el contador vivo
+// por la diferencia exacta (cashDelta). Lo usan tanto el click directo como el mini-modal de Ahorro.
+function commitItemPaid(k){
+  cashDelta(()=>{
+    if(d.itemPaid[k])delete d.itemPaid[k];else d.itemPaid[k]=true;
+    // Sub (g-i-j): si TODAS las subs quedan ✓, el padre se marca solo; si desmarco una, el padre se desmarca.
+    const pp=k.split('-');
+    if(pp.length===3){const pk=pp[0]+'-'+pp[1], row=d[pp[0]]&&d[pp[0]][+pp[1]];
+      if(row&&hasSubs(row)){ if(row.sub.every((s,j)=>d.itemPaid[pk+'-'+j])) d.itemPaid[pk]=true; else delete d.itemPaid[pk]; }}
+  });
+  save();render();
+}
+// Mini-modal: al marcar ✓ una categoría CREADA de Ahorro, pregunta con 2 botones a dónde fue la plata.
+let ahoPending=null; // {k, amt} mientras el overlay está abierto
+function askAhoDestino(k,amt){
+  ahoPending={k,amt};
+  const el=document.getElementById('aho-card');
+  if(!el){commitItemPaid(k);return;} // sin overlay (fallback): solo marca (se fue)
+  el.innerHTML='<div class="ci-h">✓ '+esc(ahoKeyLabel(k))+' — '+pe(amt)+'</div>'+
+    '<div class="ci-sub">¿Esta plata se pagó o se quedó en tu Reserva?</div>'+
+    '<div class="aho-opts">'+
+      '<button class="aho-opt" data-ahodest="pago"><b>💸 Se pagó</b><span>salió a alguien o a una deuda</span></button>'+
+      '<button class="aho-opt" data-ahodest="reserva"><b>🔒 A mi Reserva</b><span>me lo guardé yo</span></button>'+
+    '</div>'+
+    '<button class="ci-cancel aho-cancel" data-ahodest="cancel">Cancelar</button>';
+  const ov=document.getElementById('aho-ovl'); if(ov)ov.hidden=false;
+}
+(function(){const ov=document.getElementById('aho-ovl'); if(!ov)return;
+  ov.addEventListener('click',e=>{
+    const b=e.target.closest('[data-ahodest]');
+    if(!b){ if(e.target===ov){ov.hidden=true;ahoPending=null;} return; } // click en el fondo = cancelar
+    const dest=b.dataset.ahodest, p=ahoPending; ahoPending=null; ov.hidden=true;
+    if(!p||dest==='cancel')return; // no se marca el ✓
+    if(dest==='reserva'){ snapshot(); if(!d.ahoMoved)d.ahoMoved={}; d.ahoMoved[p.k]=p.amt;
+      fondo+=p.amt; saveFondo(); addResLog(p.amt,ahoKeyLabel(p.k)); }
+    commitItemPaid(p.k);
+  });
+})();
 let asigna=null; // modo "mándalo a un lugar específico": {pool, orig} mientras repartes en las cajas
 // Déficit del presupuesto = lo presupuestado por encima del ingreso (gasto − ingreso).
 function wfDeficit(){const ti=sum(d.inc);let gas=0;buckets.forEach(b=>{const g=b[0];let a=(g==='nec'||g==='luj')?sumCash(d[g]):sum(d[g]);if(g==='aho')a+=debtPaySum();gas+=a;});return Math.max(gas-ti,0);}
@@ -2005,40 +2051,25 @@ app.addEventListener('click',e=>{
         if(d.incGot)delete d.incGot[k];
       }
       save();render();return;}
-    // ✓ en categoría libre de AHORRO: la plata SALIÓ de tus cuentas sí o sí (baja el contador vivo),
-    // pero la caja no puede adivinar A DÓNDE — Ahorro alberga los 4 inquilinos del 20 (deuda a alguien
-    // se ESFUMA; pagarte a ti se MUDA a la Reserva, tu alcancía aparte). Decisión DD (5 jul): preguntar
-    // al marcar, dos botones. El grupo Deuda (Préstamo/Tarjeta) nunca pregunta: eso siempre se va.
-    if(k.indexOf('aho-')===0){
-      if(!d.itemPaid[k]){ // marcando
-        const amt=ahoKeyAmount(k);
-        if(amt>0.5){
-          // Las categorías conocidas no preguntan (lógica DD): Ahorro/Inversión = plata tuya → Reserva
-          // directo. Solo las categorías que TÚ creaste preguntan, porque solo tú sabes a dónde fue.
-          const catLbl=((d.aho[+k.split('-')[1]]||{}).l||'').trim().toLowerCase();
-          const esPropio=/^(ahorro|inversi[oó]n)$/.test(catLbl);
-          const guarda=esPropio||confirm('✓ '+ahoKeyLabel(k)+' — S/ '+Math.round(amt)+'\n\n¿Dónde quedó esta plata?\n\nACEPTAR → En mi Reserva (me la guardé yo)\nCANCELAR → Se fue (pagué una deuda o a alguien)');
-          if(guarda){
-            snapshot();
-            if(!d.ahoMoved)d.ahoMoved={}; d.ahoMoved[k]=amt;
-            fondo+=amt; saveFondo(); addResLog(amt,ahoKeyLabel(k));
-          }
-        }
-      } else { // destildando → si había viajado a la Reserva, la devuelve exacto; si se fue, solo revierte el check
-        const amt=(d.ahoMoved&&d.ahoMoved[k])||0;
-        if(amt>0.5){snapshot();fondo-=amt;saveFondo();addResLog(-amt,ahoKeyLabel(k)+' · deshecho');}
-        if(d.ahoMoved)delete d.ahoMoved[k];
+    // ✓ en AHORRO: la plata SALIÓ de tus cuentas sí o sí (baja el contador vivo), pero la caja no adivina
+    // A DÓNDE — Ahorro alberga los 4 inquilinos del 20. Ahorro/Inversión = tuyas → Reserva directo. Una
+    // categoría CREADA por ti puede ser una deuda a alguien (se esfuma) o algo que apartaste → pregunta con
+    // 2 botones claros (mini-modal aho-ovl, async → completa en su handler). El grupo Deuda nunca pregunta.
+    if(k.indexOf('aho-')===0 && !d.itemPaid[k]){ // marcando
+      const amt=ahoKeyAmount(k);
+      if(amt>0.5){
+        const catLbl=((d.aho[+k.split('-')[1]]||{}).l||'').trim().toLowerCase();
+        if(/^(ahorro|inversi[oó]n)$/.test(catLbl)){ // conocida → Reserva directo, sin preguntar
+          snapshot(); if(!d.ahoMoved)d.ahoMoved={}; d.ahoMoved[k]=amt;
+          fondo+=amt; saveFondo(); addResLog(amt,ahoKeyLabel(k));
+        } else { askAhoDestino(k,amt); return; } // creada → pregunta; el overlay marca y aplica
       }
+    } else if(k.indexOf('aho-')===0){ // destildando → si viajó a la Reserva la devuelve exacto
+      const amt=(d.ahoMoved&&d.ahoMoved[k])||0;
+      if(amt>0.5){snapshot();fondo-=amt;saveFondo();addResLog(-amt,ahoKeyLabel(k)+' · deshecho');}
+      if(d.ahoMoved)delete d.ahoMoved[k];
     }
-    cashDelta(()=>{ // el toggle (y su cascada padre/subs) ajusta "Dinero que tienes ahora" al instante
-      if(d.itemPaid[k])delete d.itemPaid[k];else d.itemPaid[k]=true;
-      // Si marqué una SUBcategoría (g-i-j): cuando TODAS las subs de la categoría quedan ✓, se marca
-      // sola la categoría padre; si desmarco una, se desmarca el padre.
-      const pp=k.split('-');
-      if(pp.length===3){const pk=pp[0]+'-'+pp[1], row=d[pp[0]]&&d[pp[0]][+pp[1]];
-        if(row&&hasSubs(row)){ if(row.sub.every((s,j)=>d.itemPaid[pk+'-'+j])) d.itemPaid[pk]=true; else delete d.itemPaid[pk]; }}
-    });
-    save();render();}
+    commitItemPaid(k);}
   else if(b.classList.contains('rm')){
     snapshot();
     const g=b.dataset.grp,i=+b.dataset.idx;
