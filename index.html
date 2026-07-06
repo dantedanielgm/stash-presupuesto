@@ -957,13 +957,12 @@ function applyView(){
   const reset=document.querySelector('.reset');if(reset)reset.style.display=inicio?'':'none';
   const tpl=document.querySelector('.tpl');if(tpl)tpl.style.display=inicio?'':'none';       // plantillas y backup
   const bk=document.querySelector('.backup');if(bk)bk.style.display=inicio?'':'none';       // son cosas de Inicio
-  // Deudas = estado de cuenta del ciclo (informe + plan + jugada) + el banco (gestión).
+  // Deudas = estado de cuenta REAL del ciclo (informe, lo ejecutado) + gestión de deudas (el banco).
+  // El plan-de-mínimos (1807) y la jugada quedaron obsoletos → los reemplazó Inicio + el asesor de Balance.
   // Reserva = activos (colchón + metas) con Inversiones como piso 3 adentro.
   setD('sec-informe', view==='deudas');
   setD('debts', view==='deudas');
   setD('debts-mgmt', view==='deudas');
-  setD('planbox', view==='deudas');
-  setD('advisorbox', view==='deudas');
   setD('sec-invertir', view==='fondo');
   setD('sec-fondo', view==='fondo');
   document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
@@ -1629,23 +1628,49 @@ function render(){
 }
 
 // Informe final: a dónde va la plata + ¿reduces o creces deuda?
+// Estado de cuenta del ciclo: lo que REALMENTE pasó (lo marcado ✓), no lo presupuestado — y respeta
+// la distinción Reserva vs "se fue": un ✓ de Ahorro que viajó a tu Reserva es ahorro; uno que "se fue"
+// (CumpleFania: te prestaron y devolviste) cuenta como DEUDA pagada, no como ahorro. Lee el ciclo activo
+// (swipe atrás = el estado de cuenta de esa quincena). Espeja ejecutadoPorGrupo para nec/luj (misma verdad
+// que la columna ✓Pagado de Inicio).
+function ejecutadoDetalle(){
+  const r={nec:0,luj:0,ahoReserva:0,ahoSeFue:0,deudaBanco:0};
+  ['nec','luj'].forEach(g=>{(d[g]||[]).forEach((row,i)=>{
+    const padre=!!(d.itemPaid&&d.itemPaid[g+'-'+i]);
+    if(hasSubs(row)){ if(!row.tj)row.sub.forEach((s,j)=>{ if((padre||(d.itemPaid&&d.itemPaid[g+'-'+i+'-'+j]))&&!s.tj)r[g]+=parseFloat(s.a)||0; }); }
+    else if(padre&&!row.tj){ r[g]+=parseFloat(row.a)||0; }
+  });});
+  (d.aho||[]).forEach((row,i)=>{
+    const key='aho-'+i, padre=!!(d.itemPaid&&d.itemPaid[key]);
+    const clasi=(k,amt)=>{ if(d.ahoMoved&&(d.ahoMoved[k]!=null||d.ahoMoved[key]!=null))r.ahoReserva+=amt; else r.ahoSeFue+=amt; };
+    if(hasSubs(row)){ row.sub.forEach((s,j)=>{ const sk=key+'-'+j; if(padre||(d.itemPaid&&d.itemPaid[sk]))clasi(sk,parseFloat(s.a)||0); }); }
+    else if(padre){ clasi(key,parseFloat(row.a)||0); }
+  });
+  if(d.paid)debts.filter(x=>!x.auto).forEach(x=>{ if(d.paid[x.n])r.deudaBanco+=(parseFloat(d.paidAmt&&d.paidAmt[x.n])||debtAmt(snapOf(x.n)||x,(d.debtPay&&d.debtPay[x.n])||'min')); });
+  return r;
+}
 function informeH(){
-  const ti=sum(d.inc), p=computePlan();
-  const necCash=sumCash(d.nec), lujCash=sumCash(d.luj), ahoSav=sum(d.aho);
-  const debtPay=p.paySum, tarj=p.tarj, total=necCash+lujCash+ahoSav+debtPay;
-  const pct=v=>ti>0?Math.round(v/ti*100):0;
-  const bar=(label,v,cls)=>'<div class="inf-row"><span class="inf-l">'+label+'</span><span class="inf-track"><span class="inf-fill '+cls+'" style="width:'+Math.min(pct(v),100)+'%"></span></span><span class="inf-v">'+pe(v)+' <i>'+pct(v)+'%</i></span></div>';
-  let h='<div class="inf-h">A dónde va tu plata esta quincena</div>';
-  h+=bar('Necesidades (efectivo)',necCash,'c-nec');
-  h+=bar('Gustos (efectivo)',lujCash,'c-luj');
-  h+=bar('Ahorro (Reserva + Inversión)',ahoSav,'c-aho');
-  h+=bar('Deuda (pago de mínimos)',debtPay,'c-deu');
-  h+='<div class="inf-tot">Destinas <b>'+pe(total)+'</b> de <b>'+pe(ti)+'</b> de ingreso'+(ti-total>0.5?' · te queda <b>'+pe(ti-total)+'</b> libre':'')+'</div>';
-  h+='<div class="inf-h" style="margin-top:1.3rem">Deuda: ¿la reduces o la creces?</div>';
-  h+='<div class="inf-deu"><div>Cargas <b>nuevas</b> a tarjeta este mes <span>'+pe(tarj)+'</span></div><div>Pagas a tus deudas <span>'+pe(debtPay)+'</span></div></div>';
-  if(debtPay>=tarj+0.5) h+='<div class="inf-verdict ok">✅ Pagas <b>'+pe(debtPay-tarj)+'</b> más de lo que generas — vas <b>reduciendo</b> deuda.</div>';
-  else if(tarj>debtPay+0.5) h+='<div class="inf-verdict bad">⚠️ Generas <b>'+pe(tarj-debtPay)+'</b> más deuda de la que pagas — está <b>creciendo</b>. Tarjetea menos o abona más.</div>';
-  else h+='<div class="inf-verdict neutral">➖ Pagas casi lo mismo que cargas — tu deuda se mantiene.</div>';
+  const e=ejecutadoDetalle();
+  const ahorro=e.ahoReserva, deuda=e.deudaBanco+e.ahoSeFue;
+  const salido=e.nec+e.luj+deuda;        // lo que dejó tus cuentas
+  const movido=salido+ahorro;            // + lo que apartaste a tu Reserva
+  const cargas=sumTj(d.nec)+sumTj(d.luj); // deuda NUEVA: lo que va a tarjeta este ciclo
+  let h='<div class="inf-h">Lo que hiciste este ciclo <span style="color:var(--tx3);font-weight:400">(lo marcado ✓)</span></div>';
+  if(movido<0.5 && cargas<0.5){
+    return h+'<div class="dnote">Aún no marcaste nada como pagado este ciclo. Ve marcando ✓ lo que pagas y aquí verás tu estado de cuenta real.</div>';
+  }
+  const pct=v=>movido>0?Math.round(v/movido*100):0;
+  const bar=(label,v,cls)=> v>0.5?'<div class="inf-row"><span class="inf-l">'+label+'</span><span class="inf-track"><span class="inf-fill '+cls+'" style="width:'+Math.min(pct(v),100)+'%"></span></span><span class="inf-v">'+pe(v)+' <i>'+pct(v)+'%</i></span></div>':'';
+  h+=bar('Necesidades',e.nec,'c-nec');
+  h+=bar('Gustos',e.luj,'c-luj');
+  h+=bar('Ahorro (a tu Reserva)',ahorro,'c-aho');
+  h+=bar('Deuda pagada',deuda,'c-deu');
+  h+='<div class="inf-tot">Moviste <b>'+pe(movido)+'</b>'+(salido>0.5?' — de eso <b>'+pe(salido)+'</b> salió de tus cuentas':'')+(ahorro>0.5?' y <b>'+pe(ahorro)+'</b> quedó en tu Reserva':'')+'.</div>';
+  h+='<div class="inf-h" style="margin-top:1.3rem">Tu deuda: ¿bajó o creció?</div>';
+  h+='<div class="inf-deu"><div>Pagaste a tus deudas <span>'+pe(deuda)+'</span></div><div>Cargaste <b>nuevo</b> a tarjeta <span>'+pe(cargas)+'</span></div></div>';
+  if(deuda>=cargas+0.5) h+='<div class="inf-verdict ok">✅ Pagaste <b>'+pe(deuda-cargas)+'</b> más de lo que cargaste — tu deuda <b>bajó</b> este ciclo.</div>';
+  else if(cargas>deuda+0.5) h+='<div class="inf-verdict bad">⚠️ Cargaste <b>'+pe(cargas-deuda)+'</b> más de lo que pagaste — tu deuda <b>creció</b>. Tarjetea menos o abona más.</div>';
+  else h+='<div class="inf-verdict neutral">➖ Pagaste casi lo mismo que cargaste — tu deuda se mantuvo.</div>';
   return h;
 }
 function refreshInforme(){const el=document.getElementById('informe-body');if(el)el.innerHTML=informeH();}
@@ -2582,8 +2607,6 @@ function renderDebts(){
   const el=document.getElementById('debts');if(!el)return;
   if(typeof ensureDebtSnaps==='function')ensureDebtSnaps();
   el.innerHTML=
-    '<div class="plan" id="planbox">'+planInner(computePlan())+'</div>'+
-    '<div id="advisorbox">'+advisorH()+'</div>'+
     '<div id="debts-mgmt">'+
       '<h2>Deudas y tarjetas</h2>'+
       '<div class="dnote">Tus obligaciones reales. La app calcula qué pagar primero con el ingreso del mes (suma de ambas quincenas). Tus datos nunca salen de tu compu.</div>'+
