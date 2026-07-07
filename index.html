@@ -1034,8 +1034,12 @@ function createCycleForToday(type){
 }
 (function resolveByDate(){
   const hoy=isoToday(), cur=cycleOf(activeQ);
-  if(cur.start&&cur.end&&cur.start<=hoy&&hoy<=cur.end)return; // el guardado sigue vigente — no molestar
+  const isClosed=id=>{try{const x=JSON.parse(localStorage.getItem(keyFor(id)));return !!(x&&x.closed);}catch(e){return false;}};
+  if(cur.start&&cur.end&&cur.start<=hoy&&hoy<=cur.end&&!isClosed(activeQ))return; // el guardado sigue vigente
   let id=cycleForToday();
+  // Si el ciclo de hoy ya se CERRÓ, tu presente es el siguiente sin cerrar (cerrar = pasar la página;
+  // la fecha no puede devolverte a una página que ya pasaste).
+  while(id&&isClosed(id)){const k=cycles.findIndex(c=>c.id===id);id=(k>=0&&k<cycles.length-1)?cycles[k+1].id:null;}
   if(!id){ const dated=cycles.filter(x=>x.end);
     const last=dated.length?dated.reduce((a,b)=>a.end>b.end?a:b):null;
     if(last&&last.end<hoy) id=createCycleForToday(last.type==='m'?'m':'q'); }
@@ -1326,13 +1330,16 @@ function bancoExtra(){ // null = sin cuentas · extra>0 plata sin trabajo · ext
   if(!hasCuentas())return null;
   const ejec=(typeof ejecutadoSum==='function')?ejecutadoSum():0;
   let util=0;buckets.forEach(b=>{const g=b[0];let a=(g==='nec'||g==='luj')?sumCash(d[g]):sum(d[g]);if(g==='aho')a+=debtPaySum();util+=a;});
-  const pendiente=Math.max(util-ejec,0), libre=Math.max(lastSaldo||0,0), total=saldoVivo();
+  const pendiente=Math.max(util-ejec,0), total=saldoVivo();
   // Ingresos SIN ✓ = "por llegar" (cuentas por cobrar): plata que el plan espera pero aún no está
-  // en tus cuentas. No cuenta como tuya (extra) pero SÍ cubre el plan (evita el rojo mentiroso).
+  // en tus cuentas. No es tuya todavía, pero SÍ cubre el plan (sin esto, la conciliación gritaba
+  // "fuga" cuando el sueldo simplemente no había llegado — y tapaba el botón de tu plata en mano).
   const porLlegar=(d.inc||[]).reduce((t,r,i)=>t+((d.itemPaid&&d.itemPaid['inc-'+i])?0:(parseFloat(r.a)||0)),0);
-  // Total vivo (ya neto de TODO lo marcado ✓) − lo que aún debes pagar − libre = residuo sin trabajo.
-  // No se resta la Reserva: lo ahorrado ya salió del banco al marcarlo (no es un apartado del total).
-  return {extra:total-pendiente-libre, pendiente, libre, total, porLlegar};
+  // Ecuación completa (cada sol, presente y futuro, con un trabajo):
+  //   en mano + por llegar = pendiente de pagar + libre del plan + SIN TRABAJO
+  // saldoPlan va SIN clamp: si el plan está en déficit, ese hueco también lo cubre tu plata en mano.
+  const saldoPlan=lastSaldo||0;
+  return {extra:total+porLlegar-pendiente-saldoPlan, pendiente, libre:Math.max(saldoPlan,0), saldoPlan, total, porLlegar};
 }
 function windfallPlan(extra){
   const props=[]; let resto=extra;
@@ -1454,8 +1461,12 @@ function wfDeficit(){const ti=sum(d.inc);let gas=0;buckets.forEach(b=>{const g=b
 // Mete plata al presupuesto como una línea de ingreso "De tu plata" (crece si ya existe). NO baja tu
 // dinero real — solo le da un trabajo; el dinero baja recién cuando pagas (marcas ✓).
 function injectPlata(monto){monto=Math.round(monto);if(monto<=0)return;
-  const row=(d.inc||[]).find(r=>r.fromPlata);
-  if(row)row.a=(parseFloat(row.a)||0)+monto; else d.inc.push({l:'De tu plata',a:monto,fromPlata:true});}
+  let idx=(d.inc||[]).findIndex(r=>r.fromPlata);
+  if(idx>=0){d.inc[idx].a=(parseFloat(d.inc[idx].a)||0)+monto;} else {d.inc.push({l:'De tu plata',a:monto,fromPlata:true});idx=d.inc.length-1;}
+  // Nace MARCADA como recibida: esta plata YA está en tu mano (no es "por llegar" — contarla ahí
+  // la duplicaría). No toca el contador de "Dinero que tienes": la plata ya vive en ese número.
+  const k='inc-'+idx; if(!d.itemPaid)d.itemPaid={}; d.itemPaid[k]=true;
+  if(!d.incGot)d.incGot={}; d.incGot[k]=(parseFloat(d.incGot[k])||0)+monto;}
 function closeWf(){wf=null;const ov=document.getElementById('wf-ovl');if(ov)ov.hidden=true;}
 function openWindfall(){
   const bx=bancoExtra(); if(!bx||bx.extra<=0.5)return;
@@ -1887,14 +1898,13 @@ function recompute(){
      if(pg>0.5){cs.style.display='';cs.innerHTML='ya pagaste <b>'+pn(pg)+'</b> con tus ✓ desde tu último número';}else cs.style.display='none';}}
   const br=document.getElementById('banco-rec'), bc=document.getElementById('banco-cta');
   if(br&&bc){ const bx=bancoExtra();
-    // Desglose: cada sol de tus cuentas cae en un cajón (comprometido / libre / reserva / sin trabajo).
-    const claim=bx?('Comprometido <b>'+pe(bx.pendiente)+'</b> · libre <b>'+pe(bx.libre)+'</b>'):'';
-    if(!bx){ br.innerHTML='Agrega tus cuentas y su saldo — te digo si cada sol tiene trabajo, y si te llegó plata extra te armo la jugada.'; bc.innerHTML=''; }
-    else if(bx.extra>0.5){ br.innerHTML='De tus <b>'+pe(bx.total)+'</b>: '+claim+' → hay <b style="color:var(--ok)">'+pe(bx.extra)+'</b> sin trabajo ✨';
-      bc.innerHTML='<button class="banco-cta" data-wfopen="1">Dale un trabajo a esos '+pe(bx.extra)+' →</button>'; }
-    else if(bx.extra<-0.5 && bx.extra+bx.porLlegar>=-0.5){ br.innerHTML='Tienes <b>'+pe(bx.total)+'</b> y esperas <b style="color:var(--accent)">'+pe(bx.porLlegar)+'</b> por llegar (ingresos sin ✓) → tu plan queda cubierto. Cuando te caiga la plata, marca su ✓ y entra sola.'; bc.innerHTML=''; }
-    else if(bx.extra<-0.5){ br.innerHTML='Tu plan reclama <b>'+pe(bx.pendiente+bx.libre)+'</b>; tienes <b>'+pe(bx.total)+'</b>'+(bx.porLlegar>0.5?' + <b>'+pe(bx.porLlegar)+'</b> por llegar':'')+' — ni así alcanza: faltan <b style="color:var(--bad)">'+pe(-(bx.extra+bx.porLlegar))+'</b>. ¿Salió algo que no registraste? Anótalo como gasto (o ajusta el plan).'; bc.innerHTML=''; }
-    else { br.innerHTML='✓ Cada sol de tus cuentas tiene trabajo — cuadra al centavo.'; bc.innerHTML=''; } }
+    // Ecuación visible: en mano + por llegar = plan pendiente (+ libre) + sin trabajo.
+    const mano=bx?('Tienes <b>'+pe(bx.total)+'</b> en mano'+(bx.porLlegar>0.5?' + <b style="color:var(--accent)">'+pe(bx.porLlegar)+'</b> por llegar':'')+' · el plan aún necesita <b>'+pe(bx.pendiente)+'</b>'+(bx.libre>0.5?' · libre <b>'+pe(bx.libre)+'</b>':'')):'';
+    if(!bx){ br.innerHTML='Pon tu dinero y te digo si cada sol tiene trabajo — y si tienes plata suelta, te armo la jugada.'; bc.innerHTML=''; }
+    else if(bx.extra>0.5){ br.innerHTML=mano+' → hay <b style="color:var(--ok)">'+pe(bx.extra)+'</b> sin trabajo ✨';
+      bc.innerHTML=d.closed?'':'<button class="banco-cta" data-wfopen="1">Dale un trabajo a esos '+pe(bx.extra)+' →</button>'; }
+    else if(bx.extra<-0.5){ br.innerHTML=mano+' → faltan <b style="color:var(--bad)">'+pe(-bx.extra)+'</b>. ¿Salió algo que no registraste? Anótalo como gasto (o ajusta el plan).'; bc.innerHTML=''; }
+    else { br.innerHTML=mano+' → <b style="color:var(--ok)">✓ cuadra al centavo</b>'+(bx.porLlegar>0.5?'. Cuando te caiga el ingreso, márcale su ✓ y entra solo a tu dinero.':'.'); bc.innerHTML=''; } }
   // Reparto 50/30/20: el chip "↻ 50/30/20" bajo Disponible enciende/apaga esto (showRollover).
   // Reparte el saldo libre ACTUAL en la columna "Repartido" de cada caja. Es la ÚNICA acción sobre
   // lo disponible — en envelope budgeting, disponible solo se asigna a los sobres. La deuda vive en
