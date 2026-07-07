@@ -903,7 +903,7 @@ function cycEditH(c){
     '<button class="ce-done" data-cyceditdone="1">Listo</button>'+
   '</div>';
 }
-function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);showRollover=true;
+function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);sanitizePaid();showRollover=true;
   // se mantiene la tab actual (Inicio/Resumen/Deudas/Invertir) al cambiar de ciclo — no resetear a Inicio
   localStorage.setItem('midas_active_cycle',activeQ);history=[];render();renderDebts();updateUndo();}
 // createCycle: crea el ciclo y devuelve su id SIN cambiar a él (el cierre lo usa para escribir
@@ -1057,6 +1057,7 @@ function pendingCloseCycle(){
   return cand;
 }
 let d=load(activeQ);
+if(sanitizePaid())save(); // limpia llaves de pago huérfanas (índices que ya no existen) al arrancar
 showRollover=true; // por defecto ON: el disponible por sector se ve al abrir
 function save(){localStorage.setItem(keyFor(activeQ),JSON.stringify(d));localStorage.setItem('midas_active_cycle',activeQ);}
 // Copia de seguridad: exportar TODA tu data a un archivo, e importarla (mover de dispositivo, restaurar).
@@ -1381,6 +1382,38 @@ function commitItemPaid(k){
       if(row&&hasSubs(row)){ if(row.sub.every((s,j)=>d.itemPaid[pk+'-'+j])) d.itemPaid[pk]=true; else delete d.itemPaid[pk]; }}
   });
   save();render();
+}
+// ===== Estado de pago llaveado por ÍNDICE (itemPaid g-i / incGot inc-i / ahoMoved aho-i) =====
+// Borrar/reordenar categorías orfana llaves, y una categoría NUEVA en ese índice hereda un ✓ FANTASMA
+// (bug real: mueve mal el dinero). Dos defensas: limpiar huérfanas al cargar, y correr las llaves al borrar.
+function sanitizePaid(){
+  let changed=false;
+  const okKey=k=>{const pp=k.split('-');const arr=(pp[0]==='inc')?d.inc:d[pp[0]];if(!Array.isArray(arr))return false;
+    const i=+pp[1];if(!(i>=0&&i<arr.length))return false;
+    if(pp.length>=3){const row=arr[i];if(!(row&&Array.isArray(row.sub)&&+pp[2]<row.sub.length))return false;}
+    return true;};
+  ['itemPaid','incGot','ahoMoved'].forEach(name=>{const obj=d[name];if(!obj||typeof obj!=='object')return;
+    Object.keys(obj).forEach(k=>{if(!okKey(k)){delete obj[k];changed=true;}});});
+  return changed;
+}
+function shiftPaidKeys(g,removedIdx,removedSub){ // corre las llaves tras borrar g[removedIdx] (o su sub j)
+  ['itemPaid','incGot','ahoMoved'].forEach(name=>{const obj=d[name];if(!obj||typeof obj!=='object')return;const nu={};
+    Object.keys(obj).forEach(k=>{const pp=k.split('-');
+      if(pp[0]!==g){nu[k]=obj[k];return;}
+      const i=+pp[1];
+      if(removedSub==null){ // se borró una categoría entera
+        if(i<removedIdx)nu[k]=obj[k];
+        else if(i===removedIdx){/* descarta la categoría y todas sus subs */}
+        else {pp[1]=String(i-1);nu[pp.join('-')]=obj[k];}
+      } else { // se borró la sub j de g[removedIdx]
+        if(i!==removedIdx||pp.length<3){nu[k]=obj[k];return;}
+        const j=+pp[2];
+        if(j<removedSub)nu[k]=obj[k];
+        else if(j===removedSub){/* descarta */}
+        else {pp[2]=String(j-1);nu[pp.join('-')]=obj[k];}
+      }
+    });
+    d[name]=nu;});
 }
 // Mini-modal: al marcar ✓ una categoría CREADA de Ahorro, pregunta con 2 botones a dónde fue la plata.
 let ahoPending=null; // {k, amt} mientras el overlay está abierto
@@ -2144,10 +2177,12 @@ app.addEventListener('click',e=>{
     const g=b.dataset.grp,i=+b.dataset.idx;
     if(b.dataset.sub!==undefined){
       const j=+b.dataset.sub;
+      shiftPaidKeys(g,i,j); // corre las llaves de pago para que sigan a las subs que quedan
       d[g][i].sub.splice(j,1);
       if(d[g][i].sub.length===0)delete d[g][i].sub; else d[g][i].a=sum(d[g][i].sub);
       save();render();
     }else{
+      shiftPaidKeys(g,i,null); // corre las llaves para que el estado de pago siga a la categoría correcta
       d[g].splice(i,1);save();render();
     }
   }
