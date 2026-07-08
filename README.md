@@ -2,7 +2,7 @@
 
 **Una app de presupuesto por sobres, hecha para quien cobra por quincenas, arrastra deudas y vive la plata de verdad — no la del Excel perfecto.**
 
-🔗 **Ábrela ahora:** **[zobuserg.github.io/stash-presupuesto](https://zobuserg.github.io/stash-presupuesto/)**
+🔗 **Ábrela ahora:** **[dantedanielgm.github.io/stash-presupuesto](https://dantedanielgm.github.io/stash-presupuesto/)**
 
 Sin cuenta, sin instalar, sin costo. Funciona en el celular y en la compu. Tus datos nunca salen de tu dispositivo.
 
@@ -36,7 +36,7 @@ Stash nace de una idea vieja y simple —**"págate a ti primero"**— y la vuel
 
 ## Cómo se usa
 
-1. **Abre el link** → [zobuserg.github.io/stash-presupuesto](https://zobuserg.github.io/stash-presupuesto/)
+1. **Abre el link** → [dantedanielgm.github.io/stash-presupuesto](https://dantedanielgm.github.io/stash-presupuesto/)
 2. Responde el onboarding corto (¿cómo te pagan? ¿tienes algo ahorrado?).
 3. Reparte tu quincena en las 3 cajas, agrega tus deudas, marca lo que pagas.
 4. Al terminar el ciclo, **ciérralo** y la app pasa a la siguiente quincena.
