@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Stash — 50/30/20</title>
+<title>Stash — 20/50/30</title>
 <!-- PWA: instalable en el teléfono. Los satélites (manifest/sw/íconos) viven junto al HTML. -->
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)">
@@ -310,6 +310,18 @@ body.focuson .ov-bar{display:none}
   border:none; cursor:pointer; transition:color .15s}
 .reset:hover{color:var(--bad)}
 
+/* Vista semáforo de deudas: fila compacta por deuda — qué debo, cuándo vence, rojo/verde */
+.dsr{display:flex; align-items:center; gap:.65rem; background:var(--card); border:1px solid var(--line); border-radius:var(--rad); box-shadow:var(--shadow); padding:.7rem .9rem; margin-bottom:.5rem}
+.dsr.is-paid{opacity:.55}
+.dsr-ic{font-size:16px; flex:none}
+.dsr-n{flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--tx)}
+.dsr-sub{display:block; font-size:11.5px; font-weight:400; color:var(--tx3); margin-top:2px}
+.dsr-dot{width:10px; height:10px; border-radius:50%; flex:none}
+.dsr-dot.ok{background:var(--ok)} .dsr-dot.warn{background:#e6a817} .dsr-dot.bad{background:var(--bad)} .dsr-dot.mut{background:var(--tx3)}
+.dsr-btn{background:transparent; border:none; color:var(--tx3); cursor:pointer; font-size:14px; padding:.2rem .35rem; flex:none}
+.dsr-btn:hover{color:var(--accent)}
+.dadd-row{display:flex; gap:.6rem; margin:.6rem 0 1.2rem}
+.dadd-row .add{flex:1; margin:0}
 /* Módulo Deudas y tarjetas */
 .debts{margin-top:2.75rem; border-top:1px solid var(--line); padding-top:1.6rem}
 .debts h2{font-size:19px; font-weight:600; letter-spacing:-.015em; margin-bottom:.2rem}
@@ -448,6 +460,8 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 /* Plantillas */
 .tpl{margin-top:1.6rem; text-align:center}
 .tpl-h{font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:var(--tx2); margin-bottom:.7rem}
+.tpl-toggle{font:inherit; background:transparent; border:none; cursor:pointer; padding:.3rem .5rem}
+.tpl-toggle:hover{color:var(--accent)}
 .tpl-list{display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center; margin-bottom:.8rem}
 .tpl-item{display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:20px; overflow:hidden}
 .tpl-load{font:inherit; font-size:12.5px; color:var(--tx); background:transparent; border:none; padding:.45rem .35rem .45rem .9rem; cursor:pointer}
@@ -758,23 +772,18 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 <div id="welcome" class="welcome" hidden>
   <div class="wel-card">
     <div class="wel-logo">Stash</div>
-    <div id="wel-step1">
-      <div class="wel-h">¿Cuánto vas a presupuestar este ciclo?</div>
-      <div class="wel-sub">Tu sueldo, o el monto que quieras repartir.</div>
-      <div class="wel-fondo">S/ <input id="wel-monto" type="number" min="0" step="1" placeholder="3700"></div>
-      <button class="wel-opt" data-welnext="1"><span class="wo-t">Continuar →</span></button>
+    <div class="wel-modes wel-langs">
+      <button class="wel-mode on" data-wellang="es">Español</button>
+      <button class="wel-mode" data-wellang="en">English</button>
     </div>
-    <div id="wel-step2" hidden>
-      <div class="wel-h">¿Qué periodo cubre?</div>
-      <div class="wel-modes">
-        <button class="wel-mode on" data-welmode="m">Un mes</button>
-        <button class="wel-mode" data-welmode="q">Una quincena</button>
-        <button class="wel-mode" data-welmode="c">Personalizado</button>
-      </div>
-      <div id="wel-period"></div>
-      <button class="wel-opt" data-finishonb="1"><span class="wo-t">Empezar →</span></button>
-    </div>
-    <div class="wel-foot">Stash reparte tu dinero con la regla <b>50/30/20</b> — el método de Elizabeth Warren (Harvard) para ahorrar primero y gastar tranquilo.</div>
+    <div class="wel-h" id="wel-q1">¿Cuánta plata vas a repartir?</div>
+    <div class="wel-sub" id="wel-sub1">Tu sueldo, o el monto que quieras organizar.</div>
+    <div class="wel-fondo">S/ <input id="wel-monto" type="number" min="0" step="1" placeholder="3700"></div>
+    <div class="wel-h" id="wel-q2" style="margin-top:1.15rem">¿Qué periodo cubre?</div>
+    <div class="wel-modes" id="wel-modes"></div>
+    <div id="wel-period"></div>
+    <button class="wel-opt" data-finishonb="1"><span class="wo-t" id="wel-go">Empezar →</span></button>
+    <div class="wel-foot" id="wel-foot">Stash reparte tu plata con la regla <b>20/50/30</b>: el ahorro sale primero, luego lo esencial, luego los gustos. Es la 50/30/20 de Harvard (Elizabeth Warren), volteada para <b>pagarte a ti primero</b>.</div>
   </div>
 </div>
 <div class="head">
@@ -783,6 +792,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
   <span class="month-wrap" style="display:none">Mes: <input id="month" placeholder="Julio 2026"></span>
   <div class="q-tabs" id="cyclebar"></div>
   <button id="undo" hidden>&#8624; Deshacer</button>
+  <button id="langbtn" title="Español / English">ES</button>
   <button id="themebtn" title="Cambiar entre modo claro y oscuro">🌙</button>
 </div>
 <div id="app"></div>
@@ -803,8 +813,17 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 </nav>
 <script>
 // ===== Tema claro/oscuro: manual con el botón ☀️/🌙; sin elección guardada, sigue al sistema =====
+// ===== Idioma (i18n ligera) =====
+// tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
+// Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
+const LANG_KEY='midas_lang';
+let lang=localStorage.getItem(LANG_KEY)||'es';
+function tx(es,en){return lang==='en'&&en!=null?en:es;}
+function setLang(l){lang=l;localStorage.setItem(LANG_KEY,l);document.documentElement.lang=l;}
+document.documentElement.lang=lang;
+
 const THEME_KEY='midas_theme';
-let theme=localStorage.getItem(THEME_KEY)||'';
+let theme=localStorage.getItem(THEME_KEY)||'light'; // default CLARO (el oscuro es opcional con el botón, no sigue al sistema)
 function applyTheme(){
   document.documentElement.dataset.theme=theme;
   const sysDark=window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches;
@@ -818,6 +837,21 @@ document.getElementById('themebtn').addEventListener('click',()=>{
   localStorage.setItem(THEME_KEY,theme);applyTheme();
 });
 applyTheme();
+// Idioma: re-pinta lo estático (tabs, FAB, botones de cabecera) y re-renderiza todo lo dinámico.
+function applyLang(){
+  const q=(sel,t)=>{const e=document.querySelector(sel);if(e)e.textContent=t;};
+  q('#langbtn',lang.toUpperCase());
+  q('[data-view="inicio"] span:last-child',tx('Inicio','Home'));
+  q('[data-view="deudas"] span:last-child',tx('Deudas','Debts'));
+  q('[data-view="fondo"] span:last-child',tx('Reserva','Reserve'));
+  q('#fab-gasto',tx('+ Gasto','+ Expense'));
+  q('#undo','↰ '+tx('Deshacer','Undo'));
+  const td=document.getElementById('today');if(td)td.textContent=fmtFechaLarga(isoToday())+(lang==='en'?', ':' ')+new Date().getFullYear();
+  if(typeof renderCycleBar==='function')renderCycleBar();
+  if(typeof render==='function'&&typeof d!=='undefined')render();
+  if(typeof renderDebts==='function')renderDebts();
+}
+document.getElementById('langbtn').addEventListener('click',()=>{setLang(lang==='en'?'es':'en');applyLang();});
 // ===== Ciclos (quincenal o mensual). Cada ciclo tiene su propio presupuesto. =====
 function keyFor(id){return 'midas_pp_'+id;}
 function loadCycles(){try{const x=JSON.parse(localStorage.getItem('midas_cycles'));if(Array.isArray(x)&&x.length)return x;}catch(e){}
@@ -830,6 +864,7 @@ function saveCycles(){localStorage.setItem('midas_cycles',JSON.stringify(cycles)
 // sin esperar a que el usuario cree un ciclo nuevo. Solo cosmético: no toca payday ni el plan de deudas.
 const CYCLEDATE_V=2;
 function migrateCycleDates(){
+  if(!localStorage.getItem('midas_cycles')) return; // usuario nuevo: no hay ciclos guardados que migrar → no escribir (si no, isFirstRun cree que ya usó la app y se salta la bienvenida)
   // Rellena start/end de ciclos legacy ENCADENANDO desde el último ciclo que ya tiene fecha
   // (arranca el día siguiente a su fin, no reinicia en el mes actual — ese era el bug julio/agosto).
   // v<2: además re-encadena los ciclos ya auto-datados (antes de v2 no existía editor manual,
@@ -871,29 +906,32 @@ function cycleStatusOf(id){const c=cycleOf(id);let x;try{x=(id===activeQ&&typeof
 function isFutureActive(){const c=cycleOf(activeQ);return !!(c.start&&c.start>isoToday()&&!(typeof d!=='undefined'&&d.closed));}
 const CYC_BADGE={cerrado:'✅',vencido:'📅',encurso:'🔵',futuro:'🔮'};
 // Fechas del ciclo: etiqueta (Julio · Quincena 1) y "cubre entre X y Y", derivadas de start/end.
-const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const MESES_ES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const MESES_EN=['january','february','march','april','may','june','july','august','september','october','november','december'];
+function MESESL(){return lang==='en'?MESES_EN:MESES_ES;}
 function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
-function fmtFecha(iso){if(!iso)return '';const p=iso.split('-');return (+p[2])+' '+MESES[(+p[1])-1].slice(0,3);}
-function fmtFechaLarga(iso){if(!iso)return '';const p=iso.split('-');return (+p[2])+' de '+MESES[(+p[1])-1];}
+function fmtFecha(iso){if(!iso)return '';const p=iso.split('-');const m=cap(MESESL()[(+p[1])-1].slice(0,3));return lang==='en'?m+' '+(+p[2]):(+p[2])+' '+m.toLowerCase();}
+function fmtFechaLarga(iso){if(!iso)return '';const p=iso.split('-');return lang==='en'?cap(MESESL()[(+p[1])-1])+' '+(+p[2]):(+p[2])+' de '+MESESL()[(+p[1])-1];}
 function cycleNum(c){const same=cycles.filter(x=>x.type===c.type);const k=same.indexOf(c);return k>=0?k+1:1;}
 function cycleLabel(c){
-  if(!c)return 'Ciclo';
+  if(!c)return tx('Ciclo','Cycle');
   if(c.start){
     const p=c.start.split('-'), y=+p[0], m=+p[1], dd=+p[2];
-    if(c.type==='m')return cap(MESES[m-1])+' '+y;
-    if(c.type==='q')return 'Quincena '+cap(MESES[m-1])+' · '+(dd<=15?'1':'2')+'/2';
-    return 'Periodo '+cycleNum(c);
+    if(c.type==='m')return cap(MESESL()[m-1])+' '+y;
+    if(c.type==='q')return tx('Quincena ','Half-month ')+cap(MESESL()[m-1])+' · '+(dd<=15?'1':'2')+'/2';
+    return tx('Periodo ','Period ')+cycleNum(c);
   }
-  if(c.type==='c')return 'Periodo '+cycleNum(c);
-  return c.label||'Ciclo';
+  if(c.type==='c')return tx('Periodo ','Period ')+cycleNum(c);
+  return c.label||tx('Ciclo','Cycle');
 }
-function cycleCubre(c){if(!c||!c.start)return '';return 'cubre entre '+fmtFechaLarga(c.start)+' y '+fmtFechaLarga(c.end);}
+function cycleCubre(c){if(!c||!c.start)return '';return tx('cubre entre ','covers ')+fmtFechaLarga(c.start)+tx(' y ',' to ')+fmtFechaLarga(c.end);}
 function isoToday(){const t=new Date();return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');}
 function lastDay(y,m){return new Date(y,m,0).getDate();} // m 1-based
 function pad2(n){return String(n).padStart(2,'0');}
 function isoOf(dt){return dt.getFullYear()+'-'+pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate());}
 function cyclePayday(id){const x=(id===activeQ&&typeof d!=='undefined')?d:load(id);return x&&x.payday||'';}
 let cycEdit=false; // true = editor de fechas del ciclo abierto bajo la barra
+let cycAddOpen=false; // true = el "+" desplegó las 3 opciones de ciclo nuevo (quincena/mes/personalizado)
 function renderCycleBar(){
   const bar=document.getElementById('cyclebar');if(!bar)return;
   const idx=cycles.findIndex(c=>c.id===activeQ), cyc=cycleOf(activeQ);
@@ -905,12 +943,16 @@ function renderCycleBar(){
       '<button class="cyc-nav" data-cycnav="-1"'+(idx<=0?' disabled':'')+'>‹</button>'+
       '<span class="cyc-cur"><span class="cyc-badge" title="'+cycleStatusOf(activeQ)+'">'+(CYC_BADGE[cycleStatusOf(activeQ)]||'')+'</span> '+esc(cycleLabel(cyc))+'</span>'+
       '<button class="cyc-nav" data-cycnav="1"'+(idx>=cycles.length-1?' disabled':'')+'>›</button>'+
-      '<button class="cyc-edit'+(cycEdit?' on':'')+'" data-cycedit="1" title="Editar fechas de este ciclo">✎</button>'+
+      '<button class="cyc-edit'+(cycEdit?' on':'')+'" data-cycedit="1" title="'+tx('Editar fechas de este ciclo','Edit this cycle\'s dates')+'">✎</button>'+
     '</div>'+
-    '<div class="cyc-addrow">'+
-      '<button class="cyc-add" data-addcycle="q" title="Agregar quincena">+Q</button>'+
-      '<button class="cyc-add" data-addcycle="m" title="Agregar mes">+M</button>'+
-      '<button class="cyc-add" data-addcycle="c" title="Agregar periodo personalizado">+P</button>'+
+    // Un solo "+" (crear ciclo) — al tocarlo despliega las 3 opciones. Tres botones crípticos
+    // (+Q/+M/+P) siempre visibles eran ruido y se confundían con el ✎ (que edita el actual).
+    '<div class="cyc-addrow">'+(cycAddOpen
+      ? '<button class="cyc-add" data-addcycle="q">'+tx('Quincena','Half-month')+'</button>'+
+        '<button class="cyc-add" data-addcycle="m">'+tx('Mes','Month')+'</button>'+
+        '<button class="cyc-add" data-addcycle="c">'+tx('Personalizado','Custom')+'</button>'+
+        '<button class="cyc-add" data-addclose="1" title="'+tx('Cancelar','Cancel')+'">✕</button>'
+      : '<button class="cyc-add" data-addopen="1" title="'+tx('Crear un ciclo nuevo','Create a new cycle')+'">'+tx('+ Nuevo ciclo','+ New cycle')+'</button>')+
     '</div>'+
     (cycEdit?cycEditH(cyc):'');
 }
@@ -918,14 +960,14 @@ function renderCycleBar(){
 function cycEditH(c){
   const tp=(t,l)=>'<button class="ce-mode'+(c.type===t?' on':'')+'" data-cyctype="'+t+'">'+l+'</button>';
   return '<div class="cyc-editor">'+
-    '<div class="ce-modes">'+tp('q','Quincena')+tp('m','Mes')+tp('c','Periodo')+'</div>'+
+    '<div class="ce-modes">'+tp('q',tx('Quincena','Half-month'))+tp('m',tx('Mes','Month'))+tp('c',tx('Periodo','Period'))+'</div>'+
     '<div class="ce-dates">'+
-      '<label class="ce-l">Desde<input type="date" data-cycdate="start" value="'+(c.start||'')+'"></label>'+
-      '<label class="ce-l">Hasta<input type="date" data-cycdate="end" value="'+(c.end||'')+'"></label>'+
+      '<label class="ce-l">'+tx('Desde','From')+'<input type="date" data-cycdate="start" value="'+(c.start||'')+'"></label>'+
+      '<label class="ce-l">'+tx('Hasta','To')+'<input type="date" data-cycdate="end" value="'+(c.end||'')+'"></label>'+
     '</div>'+
     // Cerrar el ciclo vive acá (operación DEL ciclo). El caso normal ya lo trae el banner automático al vencer.
-    (c.id===activeQ?'<button class="ce-cerrar" data-cerrar="1">'+(d.closed?'✅ Ciclo cerrado — reabrir/revisar':'Cerrar este ciclo y pasar al siguiente →')+'</button>':'')+
-    '<button class="ce-done" data-cyceditdone="1">Listo</button>'+
+    (c.id===activeQ?'<button class="ce-cerrar" data-cerrar="1">'+(d.closed?tx('✅ Ciclo cerrado — reabrir/revisar','✅ Cycle closed — reopen/review'):tx('Cerrar este ciclo y pasar al siguiente →','Close this cycle and move to the next →'))+'</button>':'')+
+    '<button class="ce-done" data-cyceditdone="1">'+tx('Listo','Done')+'</button>'+
   '</div>';
 }
 function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);sanitizePaid();showRollover=true;
@@ -1001,10 +1043,10 @@ function applyView(){
   const reset=document.querySelector('.reset');if(reset)reset.style.display=inicio?'':'none';
   const tpl=document.querySelector('.tpl');if(tpl)tpl.style.display=inicio?'':'none';       // plantillas y backup
   const bk=document.querySelector('.backup');if(bk)bk.style.display=inicio?'':'none';       // son cosas de Inicio
-  // Deudas = estado de cuenta REAL del ciclo (informe, lo ejecutado) + gestión de deudas (el banco).
-  // El plan-de-mínimos (1807) y la jugada quedaron obsoletos → los reemplazó Inicio + el asesor de Balance.
+  // El informe es del CICLO, no de las deudas → vive en Inicio (al final). Un usuario sin deudas
+  // jamás lo vería si estuviera en la tab Deudas. Deudas queda puro: gestión de deudas (el banco).
   // Reserva = activos (colchón + metas) con Inversiones como piso 3 adentro.
-  setD('sec-informe', view==='deudas');
+  setD('sec-informe', inicio);
   setD('debts', view==='deudas');
   setD('debts-mgmt', view==='deudas');
   setD('sec-invertir', view==='fondo');
@@ -1019,13 +1061,14 @@ function focusGo(delta){const scenes=focusScenes();
 function wizGo(step){wizStep=Math.max(0,Math.min(step,WIZ.length-1));
   const el=document.getElementById(WIZ[wizStep]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
 
+// Las categorías semilla nacen en el idioma elegido (son DATA: una vez creadas, el usuario las edita).
 const def=()=>({
   month:'',
   payday:'',
-  inc:[{l:'Sueldo / quincena',a:0}],
-  nec:[{l:'Gastos fijos (luz, agua)',a:0},{l:'Comida',a:0},{l:'Transporte',a:0},{l:'Salud',a:0},{l:'Proyecto / Sueño',a:0}],
-  luj:[{l:'Gustos / diversión',a:0},{l:'Regalos / cumpleaños',a:0}],
-  aho:[{l:'Ahorro',a:0},{l:'Inversión',a:0}]
+  inc:[{l:tx('Sueldo / quincena','Paycheck'),a:0}],
+  nec:[{l:tx('Gastos fijos (luz, agua)','Fixed bills (utilities)'),a:0},{l:tx('Comida','Food'),a:0},{l:tx('Transporte','Transport'),a:0},{l:tx('Salud','Health'),a:0},{l:tx('Proyecto / Sueño','Project / Dream'),a:0}],
+  luj:[{l:tx('Gustos / diversión','Fun / treats'),a:0},{l:tx('Regalos / cumpleaños','Gifts / birthdays'),a:0}],
+  aho:[{l:tx('Ahorro','Savings'),a:0},{l:tx('Inversión','Investing'),a:0}]
 });
 
 function load(q){
@@ -1117,12 +1160,16 @@ function applyTemplate(name){
   d.itemPaid={};
   save();render();renderDebts();
 }
+let tplOpen=false; // plantillas colapsadas por defecto: es tarea de admin, no de uso diario — no ensucia Inicio
 function templatesH(){
   const t=loadTemplates();
-  let h='<div class="tpl"><div class="tpl-h">📋 Plantillas</div>';
-  if(t.length) h+='<div class="tpl-list">'+t.map(x=>'<span class="tpl-item"><button class="tpl-load" data-loadtpl="'+esc(x.name)+'">'+esc(x.name)+'</button><button class="tpl-del" data-deltpl="'+esc(x.name)+'" aria-label="Borrar">&times;</button></span>').join('')+'</div>';
-  else h+='<div class="tpl-empty">Arma una quincena y guárdala como plantilla para reusar su estructura en las siguientes.</div>';
-  h+='<button class="bk-btn" data-savetpl="1">💾 Guardar esta quincena como plantilla</button></div>';
+  let h='<div class="tpl"><button class="tpl-h tpl-toggle" data-tpltoggle="1">📋 '+tx('Plantillas','Templates')+' '+(tplOpen?'▾':'▸')+'</button>';
+  if(tplOpen){
+    if(t.length) h+='<div class="tpl-list">'+t.map(x=>'<span class="tpl-item"><button class="tpl-load" data-loadtpl="'+esc(x.name)+'">'+esc(x.name)+'</button><button class="tpl-del" data-deltpl="'+esc(x.name)+'" aria-label="Borrar">&times;</button></span>').join('')+'</div>';
+    else h+='<div class="tpl-empty">Arma una quincena y guárdala como plantilla para reusar su estructura en las siguientes.</div>';
+    h+='<button class="bk-btn" data-savetpl="1">💾 Guardar esta quincena como plantilla</button>';
+  }
+  h+='</div>';
   return h;
 }
 
@@ -1626,6 +1673,8 @@ const sumCash=a=>a.reduce((t,r)=>t+(hasSubs(r)?(r.tj?0:r.sub.reduce((u,s)=>u+(s.
 const sumTj=a=>a.reduce((t,r)=>t+(hasSubs(r)?(r.tj?(parseFloat(r.a)||0):r.sub.reduce((u,s)=>u+(s.tj?(parseFloat(s.a)||0):0),0)):(r.tj?(parseFloat(r.a)||0):0)),0);
 const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 const buckets=[['aho','Ahorro',.2],['nec','Necesidades',.5],['luj','Gustos',.3]];
+const BUCKET_EN={aho:'Savings',nec:'Needs',luj:'Wants'};
+function bucketName(g,es){return lang==='en'?(BUCKET_EN[g]||es):es;}
 const hasSubs=r=>r.sub&&r.sub.length>0;
 
 const TJ_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>';
@@ -1713,17 +1762,17 @@ function bucketH(g,name,pct,num){
   const wizBtn=w?'<button class="wizgo" data-gostep="'+w[0]+'">'+w[1]+'</button>':'';
   const col=collapsed[g];
   return '<div class="sec sec-tint'+(col?' is-collapsed':'')+'" id="sec-'+g+'">'+
-    '<div class="sec-h tappable" data-collapse="'+g+'" title="Plegar/desplegar"><span class="chev">'+(col?'▸':'▾')+'</span><span class="num num-'+g+'">'+num+'</span><span class="t">'+name+' <span class="secpct">· '+Math.round(pct*100)+'%</span></span></div>'+
-    (g==='aho'&&!col?'<div class="sec-note">Págate primero — esto sale antes de gastar.</div>':'')+
+    '<div class="sec-h tappable" data-collapse="'+g+'" title="'+tx('Plegar/desplegar','Collapse/expand')+'"><span class="chev">'+(col?'▸':'▾')+'</span><span class="num num-'+g+'">'+num+'</span><span class="t">'+bucketName(g,name)+' <span class="secpct">· '+Math.round(pct*100)+'%</span></span></div>'+
+    (g==='aho'&&!col?'<div class="sec-note">'+tx('Págate primero — esto sale antes de gastar.','Pay yourself first — this comes out before spending.')+'</div>':'')+
     // Movimiento que LLEGA (− X cubre el exceso de…) → arriba, bajo el título, encima de la tríada.
     // Solo en la vista desplegada (no en la compacta). El Disponible negativo ya cuenta la historia sola.
     (col?'':'<div class="ln-red sec-in" id="in-'+g+'" style="display:none"></div>')+
     '<div class="triad">'+
-      '<span class="tr"><i>Meta</i><b id="tg-'+g+'">&mdash;</b></span>'+
-      '<span class="tr"><i>Asignado</i><b class="tr-util" id="sm-'+g+'">&mdash;</b></span>'+
-      '<span class="tr"><i>Por asignar</i><b id="disp-'+g+'">&mdash;</b></span>'+
-      '<span class="tr"><i>Repartido</i><b id="repto-'+g+'" style="color:var(--ok)">&mdash;</b></span>'+
-      '<span class="tr tr-tap" data-openchecks="'+g+'" title="Ver qué falta pagar aquí"><i>✓ Pagado</i><b id="done-'+g+'">&mdash;</b></span>'+
+      '<span class="tr"><i>'+tx('Presupuesto','Budget')+'</i><b id="tg-'+g+'">&mdash;</b></span>'+
+      '<span class="tr"><i>'+tx('Asignado','Assigned')+'</i><b class="tr-util" id="sm-'+g+'">&mdash;</b></span>'+
+      '<span class="tr"><i>'+tx('Por asignar','Unassigned')+'</i><b id="disp-'+g+'">&mdash;</b></span>'+
+      '<span class="tr"><i>'+tx('Repartido','Auto-split')+'</i><b id="repto-'+g+'" style="color:var(--ok)">&mdash;</b></span>'+
+      '<span class="tr tr-tap" data-openchecks="'+g+'" title="'+tx('Ver qué falta pagar aquí','See what\'s left to pay here')+'"><i>✓ '+tx('Pagado','Paid')+'</i><b id="done-'+g+'">&mdash;</b></span>'+
     '</div>'+
     '<div class="bar"><div class="bar-fill" id="bar-'+g+'"></div></div>'+
     // Movimiento que SALE (− X se arrastra a…) + déficit total → en su lugar original (tras la barra,
@@ -1732,7 +1781,7 @@ function bucketH(g,name,pct,num){
     '<div class="bucket-body"'+(col?' style="display:none"':'')+'>'+
       (g==='aho'?ahoDebtBlockH():'')+ // Deuda arriba → las categorías nuevas caen ABAJO (al final)
       rows+
-      '<button class="add" data-add="'+g+'"><span class="p">+</span> Agregar categoría</button>'+ // también en Ahorro
+      '<button class="add" data-add="'+g+'"><span class="p">+</span> '+tx('Agregar categoría','Add category')+'</button>'+ // también en Ahorro
     '</div>'+
     wizBtn+'</div>';
 }
@@ -1761,32 +1810,32 @@ function render(){
   document.getElementById('app').innerHTML= bannersH +
     '<div class="sec" id="sec-inc" style="margin-top:.5rem">'+
       '<div class="hero-inc">'+
-        '<div class="hi-lbl">presupuesto del ciclo</div>'+
+        '<div class="hi-lbl">'+tx('presupuesto del ciclo','cycle budget')+'</div>'+
         '<div class="hi-num" id="hi-num">—</div>'+
         '<div class="hi-sub"><b id="hi-cycle"></b></div>'+
-        // La REALIDAD, siempre visible: tu plata en mano (editable) + lo que viene en camino.
-        '<div class="hi-mano">💰 En mano S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"><span class="hi-camino" id="hi-camino"></span></div>'+
+        // La REALIDAD, siempre visible: tu plata real ahora (editable) + lo que viene en camino.
+        '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">💰 '+tx('Tengo ahora','On hand')+' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"><span class="hi-camino" id="hi-camino"></span></div>'+
         '<div id="banco-cta" class="hi-chip"></div>'+
-        '<button class="hi-edit" data-incedit="1">'+(incEdit?'▲ cerrar':'✎ editar ingresos')+'</button>'+
+        '<button class="hi-edit" data-incedit="1">'+(incEdit?tx('▲ cerrar','▲ close'):tx('✎ editar ingresos','✎ edit income'))+'</button>'+
       '</div>'+
       '<div id="inc-detail"'+(incEdit?'':' style="display:none"')+'>'+
-        '<div class="sec-note" style="margin-top:.6rem">Agrega el pago que cubrirá este plazo.</div>'+
-        '<div class="sec-note" style="margin-top:-.45rem">Me pagan el: <input id="payday" data-payday="1" type="date" min="2024-01-01" max="2100-12-31" value="'+(d.payday||'')+'" style="font:inherit;font-size:13px;color:var(--accent);background:transparent;border:none;border-bottom:1.5px dashed var(--line);padding:1px 2px"></div>'+
+        '<div class="sec-note" style="margin-top:.6rem">'+tx('Agrega el pago que cubrirá este plazo.','Add the payment that covers this period.')+'</div>'+
+        '<div class="sec-note" style="margin-top:-.45rem">'+tx('Me pagan el:','I get paid on:')+' <input id="payday" data-payday="1" type="date" min="2024-01-01" max="2100-12-31" value="'+(d.payday||'')+'" style="font:inherit;font-size:13px;color:var(--accent);background:transparent;border:none;border-bottom:1.5px dashed var(--line);padding:1px 2px"></div>'+
         incRows+
-        '<button class="add" data-add="inc"><span class="p">+</span> Agregar ingreso</button>'+
-        '<div class="tot"><span class="lbl">Ingreso total proyectado</span><span class="val" id="tot-inc"></span></div>'+
+        '<button class="add" data-add="inc"><span class="p">+</span> '+tx('Agregar ingreso','Add income')+'</button>'+
+        '<div class="tot"><span class="lbl">'+tx('Ingreso total proyectado','Projected total income')+'</span><span class="val" id="tot-inc"></span></div>'+
       '</div>'+
     '</div>'+
     '<div class="heart macro-card" id="heart">'+
       '<div class="macro">'+ // 5 columnas, ALINEADAS con la tríada de cada caja. Nombres honestos: es PLAN,
-        // no realidad — "Meta" (ideal 20/50/30), "Asignado" (lo que nombraste), "Por asignar" (espacio del plan).
-        '<div class="mc"><span class="mc-l">Meta</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
-        '<div class="mc"><span class="mc-l">Asignado</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
-        '<div class="mc"><span class="mc-l">Por asignar</span><span class="mc-v" id="mc-disp">&mdash;</span></div>'+
+        // no realidad — "Presupuesto" (ideal 20/50/30), "Asignado" (lo que nombraste), "Por asignar" (espacio del plan).
+        '<div class="mc"><span class="mc-l">'+tx('Presupuesto','Budget')+'</span><span class="mc-v" id="mc-pres">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">'+tx('Asignado','Assigned')+'</span><span class="mc-v tr-util" id="mc-util">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">'+tx('Por asignar','Unassigned')+'</span><span class="mc-v" id="mc-disp">&mdash;</span></div>'+
         '<div class="mc mc-roll">'+
-          '<button class="mc-rollchip'+(showRollover?' on':'')+'" data-toggleroll="1" title="Repartir lo que falta por asignar, 50/30/20 en las 3 cajas">Repartir<br>lo libre<br><span class="mrc-r">&#8635; 50/30/20</span></button>'+
+          '<button class="mc-rollchip'+(showRollover?' on':'')+'" data-toggleroll="1" title="'+tx('Repartir lo que falta por asignar, 20/50/30 en las 3 cajas','Split what\'s unassigned, 20/50/30 across the 3 boxes')+'">'+tx('Repartir<br>lo libre','Split<br>the free')+'<br><span class="mrc-r">&#8635; 20/50/30</span></button>'+
         '</div>'+
-        '<div class="mc"><span class="mc-l">&#10003; Pagado</span><span class="mc-v" id="mc-done">&mdash;</span></div>'+
+        '<div class="mc"><span class="mc-l">&#10003; '+tx('Pagado','Paid')+'</span><span class="mc-v" id="mc-done">&mdash;</span></div>'+
       '</div>'+
       // Barra de liquidez: cuánto de lo comprometido YA soltaste (azul) y cuánto te FALTA soltar
       // (morado) — en plata, no en %. Responde "¿cuánto de mi cuenta no puedo tocar?".
@@ -1796,10 +1845,10 @@ function render(){
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
     // (Sección Balance eliminada: "en mano" vive en el hero, el asesor es un chip contextual ahí mismo,
     //  y "Cerrar ciclo" se mudó al editor del ciclo — el lápiz ✎ de la barra.)
-    '<div class="sec" id="sec-informe"><div class="sec-h"><span class="t">📊 Informe del ciclo</span></div><div id="informe-body"></div></div>'+
-    '<button class="reset" data-reset="1">Reiniciar esta quincena</button>'+
+    '<div class="sec" id="sec-informe"><div class="sec-h"><span class="t">📊 '+tx('Informe del ciclo','Cycle report')+'</span></div><div id="informe-body"></div></div>'+
+    '<button class="reset" data-reset="1">'+tx('Reiniciar esta quincena','Reset this cycle')+'</button>'+
     templatesH()+
-    '<div class="backup"><button class="bk-btn" data-export="1">⬇ Exportar copia</button><button class="bk-btn" data-import="1">⬆ Importar copia</button><input type="file" id="importfile" accept="application/json,.json" hidden></div>'+
+    '<div class="backup"><button class="bk-btn" data-export="1">⬇ '+tx('Exportar copia','Export backup')+'</button><button class="bk-btn" data-import="1">⬆ '+tx('Importar copia','Import backup')+'</button><input type="file" id="importfile" accept="application/json,.json" hidden></div>'+
     '<div id="focusnav" class="focusnav">'+
       '<button id="focus-back" class="fn-btn" data-focus="-1">← Atrás</button>'+
       '<span id="focus-label" class="fn-lbl"></span>'+
@@ -1965,7 +2014,7 @@ function recompute(){
     if(cam)cam.innerHTML=(bx&&bx.porLlegar>0.5)?' · en camino S/ '+pn(bx.porLlegar):'';
     if(bc){
       // El presente es exclusivo: solo el ciclo EN CURSO reclama tu plata. En un futuro estás planificando.
-      if(fut){bc.innerHTML='<div class="hi-chip-plan">🔮 Estás planificando un ciclo futuro — tu plata en mano se concilia en el ciclo en curso.</div>';}
+      if(fut){bc.innerHTML='<div class="hi-chip-plan">🔮 Estás planificando un ciclo futuro — tu plata real se concilia en el ciclo en curso.</div>';}
       else if(d.closed){bc.innerHTML='';}
       else if(!bx){bc.innerHTML='';}
       else if(bx.extra>0.5){bc.innerHTML='<button class="hi-chip-btn ok" data-wfopen="1">✨ S/ '+pn(bx.extra)+' sin trabajo — dale un destino →</button>';}
@@ -1989,18 +2038,20 @@ function recompute(){
   // Split-preview en la escena de Sueldo: el 50/30/20 al instante + el aval.
   const sp=document.getElementById('split-preview');
   if(sp)sp.innerHTML = ti>0
-    ? '<div class="sp-h">Tu reparto 50/30/20</div>'+
+    ? '<div class="sp-h">Tu reparto 20/50/30</div>'+
       '<div class="sp-grid"><div class="sp-c"><span>Ahorro</span><b>'+pe(ti*.2)+'</b><i>20%</i></div>'+
       '<div class="sp-c"><span>Necesidades</span><b>'+pe(ti*.5)+'</b><i>50%</i></div>'+
       '<div class="sp-c"><span>Gustos</span><b>'+pe(ti*.3)+'</b><i>30%</i></div></div>'+
       '<div class="sp-note">Regla popularizada por Elizabeth Warren (<i>All Your Worth</i>) — simple y sostenible. Y lo primero: <b>págate primero</b>, ahorrar antes de gastar (<i>El hombre más rico de Babilonia</i>).</div>'
-    : '<div class="sp-note">Pon tu sueldo arriba y verás el reparto 50/30/20 al instante.</div>';
+    : '<div class="sp-note">Pon tu sueldo arriba y verás el reparto 20/50/30 al instante.</div>';
   if(typeof applyView==='function')applyView();
 }
 
 // Cambiar / agregar ciclo (barra dinámica, delegado)
 document.getElementById('cyclebar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.addcycle){cycEdit=false;addCycle(b.dataset.addcycle);}
+  if(b.dataset.addcycle){cycEdit=false;cycAddOpen=false;addCycle(b.dataset.addcycle);}
+  else if(b.dataset.addopen){cycAddOpen=true;renderCycleBar();}
+  else if(b.dataset.addclose){cycAddOpen=false;renderCycleBar();}
   else if(b.dataset.cyc){switchCycle(b.dataset.cyc);}
   else if(b.dataset.cycnav!==undefined){const i=cycles.findIndex(c=>c.id===activeQ)+(+b.dataset.cycnav);if(i>=0&&i<cycles.length)switchCycle(cycles[i].id);}
   else if(b.dataset.cycedit){cycEdit=!cycEdit;renderCycleBar();}
@@ -2134,6 +2185,7 @@ app.addEventListener('click',e=>{
   else if(b.dataset.collapseall){const anyOpen=Object.values(collapsed).some(v=>!v);['aho','nec','luj'].forEach(g=>collapsed[g]=anyOpen);render();}
   else if(b.dataset.export){exportData();}
   else if(b.dataset.savetpl){saveAsTemplate();}
+  else if(b.dataset.tpltoggle!==undefined){tplOpen=!tplOpen;render();}
   else if(b.dataset.loadtpl!==undefined){const n=b.dataset.loadtpl;const tiene=(d.nec&&d.nec.some(r=>(parseFloat(r.a)||0)>0||(r.sub&&r.sub.length)))||(d.inc&&sum(d.inc)>0);if(!tiene||confirm('¿Cargar la plantilla "'+n+'"? Reemplaza las categorías de esta quincena.'))applyTemplate(n);}
   else if(b.dataset.deltpl!==undefined){const n=b.dataset.deltpl;if(confirm('¿Borrar la plantilla "'+n+'"?')){saveTpls(loadTemplates().filter(x=>x.name!==n));render();}}
   else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
@@ -2278,8 +2330,10 @@ function autoDebtsH(){
 function refreshAutoDebts(){const el=document.getElementById('autodebts');if(el)el.innerHTML=autoDebtsH();}
 function cuotasCountH(){const n=debts.filter(x=>x.auto).length;return n?' <span class="cc">'+n+'</span>':'';}
 const MES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const MES_EN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function dateVal(s){if(!s)return 9e15;const t=Date.parse(s);return isNaN(t)?9e15:t;}
-function dueLabel(s){if(!s)return 'sin fecha';const dt=new Date(s+'T00:00:00');return isNaN(dt)?s:dt.getDate()+' '+MES[dt.getMonth()];}
+function dueLabel(s){if(!s)return tx('sin fecha','no date');const dt=new Date(s+'T00:00:00');if(isNaN(dt))return s;
+  return lang==='en'?MES_EN[dt.getMonth()]+' '+dt.getDate():dt.getDate()+' '+MES[dt.getMonth()];}
 function quincenaData(q){
   const x=(q===activeQ)?d:load(q);
   return {payday:x.payday||'', income:sum(x.inc), nec:sumCash(x.nec), luj:sumCash(x.luj), tarj:sumTj(x.nec)+sumTj(x.luj)};
@@ -2329,18 +2383,18 @@ function computePlan(){
 function debtRowH(x,i){const card=isCardDebt(x);
   const f=(lbl,df,ph,step)=>'<label class="df-l">'+lbl+'<input data-di="'+i+'" data-df="'+df+'" type="number" step="'+(step||1)+'" value="'+(x[df]!=null?x[df]:'')+'" placeholder="'+ph+'"></label>';
   const debe=Math.max((parseFloat(x.limite)||0)-(parseFloat(x.disp)||0),0);
+  // Préstamo = lo mínimo que lo define: cuánto debes, cuánto pagas al mes, cuándo. Todo el detalle
+  // de crédito (línea, disponible, mínimo, TCEA) es asunto de TARJETA — solo aparece si es tarjeta.
   return '<div class="drow2">'+
-    '<div class="dr-top"><input class="dr-n" data-di="'+i+'" data-df="n" value="'+esc(x.n)+'" placeholder="Nombre de la deuda"><button class="rm" data-drm="'+i+'" aria-label="Eliminar">&times;</button></div>'+
+    '<div class="dr-top"><input class="dr-n" data-di="'+i+'" data-df="n" value="'+esc(x.n)+'" placeholder="'+(card?tx('Ej. Visa BCP','E.g. Visa card'):tx('Ej. Préstamo del banco','E.g. Bank loan'))+'"><button class="rm" data-drm="'+i+'" aria-label="'+tx('Eliminar','Delete')+'">&times;</button></div>'+
     '<div class="dr-grid">'+
       (card
-        ? f('Línea de crédito','limite','0',1)+f('Disponible (libre)','disp','0',1)
-        : f('Saldo (lo que debes)','total','0',0.01))+
-      f('Pago mínimo','min','0',0.01)+
-      f('Pago del mes','mes','0',0.01)+
-      (card?f('TCEA % anual','tcea','',0.01):'')+
-      '<label class="df-l">Fecha de pago<input data-di="'+i+'" data-df="vence" type="date" value="'+(x.vence||'')+'"></label>'+
+        ? f(tx('Línea de crédito','Credit limit'),'limite','0',1)+f(tx('Disponible (libre)','Available (free)'),'disp','0',1)+
+          f(tx('Pago mínimo','Minimum payment'),'min','0',0.01)+f(tx('Pago del mes','This month\'s payment'),'mes','0',0.01)+f(tx('TCEA % anual','APR % yearly'),'tcea','',0.01)
+        : f(tx('Saldo (lo que debes)','Balance (what you owe)'),'total','0',0.01)+f(tx('Cuota mensual','Monthly installment'),'min','0',0.01))+
+      '<label class="df-l">'+tx('Fecha de pago','Due date')+'<input data-di="'+i+'" data-df="vence" type="date" value="'+(x.vence||'')+'"></label>'+
     '</div>'+
-    (card?'<div class="dr-debe">Debes aprox <b>'+pe(debe)+'</b> <span>· línea − disponible (calculado, no lo tipeas)</span></div>':'')+
+    (card?'<div class="dr-debe">'+tx('Debes aprox','You owe approx.')+' <b>'+pe(debe)+'</b> <span>· '+tx('línea − disponible (calculado, no lo tipeas)','limit − available (calculated, not typed)')+'</span></div>':'')+
   '</div>';}
 function planRowH(r){
   const tag=r.status==='full'?'<span class="tag ok">al día</span>':'<span class="tag part">mínimo</span>';
@@ -2773,21 +2827,58 @@ function invertirH(){
     invSim[t.dataset.invsim]=t.value;
     const o=document.getElementById('invsim-out');if(o)o.innerHTML=invSimOut();});})();
 function refreshInvertir(){const e=document.getElementById('sec-invertir');if(e)e.innerHTML=invertirH();}
+// Fila semáforo: lo que quieres saber de una deuda de un vistazo — cuánto debes, cuándo vence,
+// y un punto rojo/ámbar/verde. Tocar ✎ abre el editor (simple si es préstamo, completo si es tarjeta).
+let debtEditIdx=null;   // índice de la deuda con el editor abierto (null = todo cerrado)
+let tjToolsOpen=false;  // herramientas de tarjeta (cuotas futuras / pasar a efectivo / simulador) colapsadas
+function debtStatusRowH(x,i){
+  const card=isCardDebt(x), hoy=isoToday();
+  const debe=parseFloat(x.total)||0;
+  const paid=!!(d.paid&&d.paid[x.n]);
+  const lim=parseFloat(x.limite)||0;
+  const over=card&&lim>0&&debe>lim;
+  let st,cls;
+  if(paid){st=tx('pagada este ciclo','paid this cycle');cls='ok';}
+  else if(over){st=tx('¡sobre el tope de la línea!','over the credit limit!');cls='bad';}
+  else if(x.vence&&x.vence<hoy){st=tx('venció el ','was due ')+dueLabel(x.vence);cls='bad';}
+  else if(x.vence){const dias=(dateVal(x.vence)-dateVal(hoy))/864e5;
+    st=tx('vence el ','due ')+dueLabel(x.vence);cls=dias<=7?'warn':'ok';}
+  else{st=tx('sin fecha de pago','no due date');cls='mut';}
+  return '<div class="dsr'+(paid?' is-paid':'')+'">'+
+    '<span class="dsr-ic">'+(card?'💳':'📄')+'</span>'+
+    '<span class="dsr-n">'+esc(x.n||(card?tx('Tarjeta','Card'):tx('Préstamo','Loan')))+
+      '<span class="dsr-sub">'+tx('debes ','you owe ')+pe(debe)+' · '+st+'</span></span>'+
+    '<span class="dsr-dot '+cls+'"></span>'+
+    '<button class="dsr-btn" data-dedit="'+i+'" title="'+tx('Editar esta deuda','Edit this debt')+'">'+(debtEditIdx===i?'▲':'✎')+'</button>'+
+  '</div>'+(debtEditIdx===i?debtRowH(x,i):'');
+}
 function renderDebts(){
   const el=document.getElementById('debts');if(!el)return;
   if(typeof ensureDebtSnaps==='function')ensureDebtSnaps();
+  const manual=debts.map((x,i)=>({x,i})).filter(r=>!r.x.auto);
+  const hayTarjetas=debts.some(isCardDebt);
+  const hayCuotas=debts.some(x=>x.auto);
   el.innerHTML=
     '<div id="debts-mgmt">'+
-      '<h2>Deudas y tarjetas</h2>'+
-      '<div class="dnote">Tus obligaciones reales. La app calcula qué pagar primero con el ingreso del mes (suma de ambas quincenas). Tus datos nunca salen de tu compu.</div>'+
+      '<h2>'+tx('Deudas','Debts')+'</h2>'+
+      '<div class="dnote">'+tx('Lo que debes, cuándo vence y cómo vas — rojo, ámbar o verde. Tus datos nunca salen de tu compu.','What you owe, when it\'s due and how you\'re doing — red, amber or green. Your data never leaves your device.')+'</div>'+
+      (manual.length
+        ? manual.map(r=>debtStatusRowH(r.x,r.i)).join('')
+        : '<div class="dnote" style="margin:.8rem 0">'+tx('No tienes deudas registradas. Si tienes un préstamo o una tarjeta, agrégalos y Stash los mete a tu plan del ciclo.','No debts yet. If you have a loan or a credit card, add them and Stash works them into your cycle plan.')+'</div>')+
+      '<div class="dadd-row">'+
+        '<button class="add" data-daddkind="loan"><span class="p">+</span> 📄 '+tx('Préstamo','Loan')+'</button>'+
+        '<button class="add" data-daddkind="card"><span class="p">+</span> 💳 '+tx('Tarjeta','Card')+'</button>'+
+      '</div>'+
       saludH()+
-      '<div class="dnote" style="margin:.2rem 0 .8rem">Edita aquí todos los datos de cada deuda — saldo, línea, disponible, mínimo, pago del mes, TCEA.</div>'+
-      debts.map((x,i)=>x.auto?'':debtRowH(x,i)).join('')+
-      '<button class="add" data-dadd="1"><span class="p">+</span> Agregar deuda</button>'+
-      '<button class="cuotas-toggle" data-cuotas="1">📅 Cuotas futuras de tarjeta'+cuotasCountH()+'</button>'+
-      '<button class="cuotas-toggle" data-allcash="1">💵 Pasar todo a efectivo (quitar tarjeteo)</button>'+
-      '<div id="autodebts" style="display:none">'+autoDebtsH()+'</div>'+
-      '<div class="plan" id="tjbox">'+tjInner()+'</div>'+
+      // Todo el tarjeteo vive AQUÍ adentro — quien no usa tarjetas nunca lo ve.
+      ((hayTarjetas||hayCuotas)
+        ? '<button class="cuotas-toggle" data-tjtools="1">💳 '+tx('Herramientas de tarjeta','Card tools')+' '+(tjToolsOpen?'▾':'▸')+cuotasCountH()+'</button>'+
+          (tjToolsOpen
+            ? '<div id="autodebts">'+autoDebtsH()+'</div>'+
+              '<button class="cuotas-toggle" data-allcash="1">💵 '+tx('Pasar todo a efectivo (quitar tarjeteo)','Move everything to cash (undo card charges)')+'</button>'+
+              '<div class="plan" id="tjbox">'+tjInner()+'</div>'
+            : '')
+        : '')+
     '</div>';
   if(typeof applyView==='function')applyView();
 }
@@ -2802,12 +2893,18 @@ debtsEl.addEventListener('input',e=>{const t=e.target;if(!t.dataset)return;
   }
   saveDebts();refreshPlan();});
 debtsEl.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
-  if(b.dataset.dadd){debts.push({n:'Nueva deuda',total:0,min:0,vence:''});saveDebts();renderDebts();}
-  else if(b.dataset.cuotas){const el=document.getElementById('autodebts');if(el){el.innerHTML=autoDebtsH();el.style.display=el.style.display==='none'?'':'none';}}
+  // Agregar con TIPO desde el inicio: préstamo (simple) o tarjeta (completa). El editor se abre solo.
+  if(b.dataset.daddkind){const kind=b.dataset.daddkind;
+    const nd={n:'',kind:kind,total:0,min:0,vence:''};
+    if(kind==='card'){nd.limite='';nd.disp='';nd.mes='';nd.tcea='';}
+    debts.push(nd);debtEditIdx=debts.length-1;saveDebts();renderDebts();
+    const inp=debtsEl.querySelector('.drow2 .dr-n');if(inp)inp.focus();}
+  else if(b.dataset.dedit!==undefined){const i=+b.dataset.dedit;debtEditIdx=(debtEditIdx===i?null:i);renderDebts();}
+  else if(b.dataset.tjtools){tjToolsOpen=!tjToolsOpen;renderDebts();}
   else if(b.dataset.allcash){allToCash();}
   else if(b.dataset.applyadvisor){applyAdvisor();}
   else if(b.dataset.paid!==undefined){toggleDebtPaid(b.dataset.paid);}
-  else if(b.dataset.drm!==undefined){debts.splice(+b.dataset.drm,1);saveDebts();renderDebts();}});
+  else if(b.dataset.drm!==undefined){debts.splice(+b.dataset.drm,1);debtEditIdx=null;saveDebts();render();renderDebts();}});
 
 // Tabs de nivel superior (Inicio · Plan · Deudas · Informe).
 document.querySelector('.tabbar').addEventListener('click',e=>{const b=e.target.closest('.tabbtn');if(!b)return;
@@ -2826,21 +2923,31 @@ function isFirstRun(){
 function showWelcome(show){const w=document.getElementById('welcome');if(w)w.hidden=!show;document.body.classList.toggle('welcoming',show);}
 let welMode='m', welHalf=1, welMonth='', welMonto=0;
 function welPeriodH(){
-  const mo='<label class="wel-pl">Mes<input type="month" id="wel-month" value="'+welMonth+'"></label>';
+  const mo='<label class="wel-pl">'+tx('Mes','Month')+'<input type="month" id="wel-month" value="'+welMonth+'"></label>';
   if(welMode==='m')return mo;
-  if(welMode==='q')return mo+'<div class="wel-half"><button data-welhalf="1" class="'+(welHalf===1?'on':'')+'">1ra · 1–15</button><button data-welhalf="2" class="'+(welHalf===2?'on':'')+'">2da · 16–fin</button></div>';
-  return '<label class="wel-pl">Desde<input type="date" id="wel-from"></label><label class="wel-pl">Hasta<input type="date" id="wel-to"></label>';
+  if(welMode==='q')return mo+'<div class="wel-half"><button data-welhalf="1" class="'+(welHalf===1?'on':'')+'">'+tx('1ra · 1–15','1st · 1–15')+'</button><button data-welhalf="2" class="'+(welHalf===2?'on':'')+'">'+tx('2da · 16–fin','2nd · 16–end')+'</button></div>';
+  return '<label class="wel-pl">'+tx('Desde','From')+'<input type="date" id="wel-from"></label><label class="wel-pl">'+tx('Hasta','To')+'<input type="date" id="wel-to"></label>';
 }
 function renderWelPeriod(){const e=document.getElementById('wel-period');if(e)e.innerHTML=welPeriodH();
-  document.querySelectorAll('.wel-mode').forEach(b=>b.classList.toggle('on',b.dataset.welmode===welMode));}
-function welNext(){ // paso 1 (monto) -> paso 2 (periodo)
-  welMonto=parseFloat((document.getElementById('wel-monto')||{}).value)||0;
-  const s1=document.getElementById('wel-step1'),s2=document.getElementById('wel-step2');
-  if(s1)s1.hidden=true; if(s2)s2.hidden=false;
-  const t=new Date(); welMonth=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');
+  document.querySelectorAll('.wel-mode[data-welmode]').forEach(b=>b.classList.toggle('on',b.dataset.welmode===welMode));}
+// Textos de la bienvenida según idioma (la tarjeta es HTML estático → se re-pintan aquí).
+function applyWelcomeLang(){
+  const s=(id,h)=>{const e=document.getElementById(id);if(e)e.innerHTML=h;};
+  s('wel-q1',tx('¿Cuánta plata vas a repartir?','How much money are you splitting up?'));
+  s('wel-sub1',tx('Tu sueldo, o el monto que quieras organizar.','Your paycheck, or any amount you want to organize.'));
+  s('wel-q2',tx('¿Qué periodo cubre?','What period does it cover?'));
+  s('wel-modes',
+    '<button class="wel-mode'+(welMode==='m'?' on':'')+'" data-welmode="m">'+tx('Un mes','One month')+'</button>'+
+    '<button class="wel-mode'+(welMode==='q'?' on':'')+'" data-welmode="q">'+tx('Una quincena','Half a month')+'</button>'+
+    '<button class="wel-mode'+(welMode==='c'?' on':'')+'" data-welmode="c">'+tx('Personalizado','Custom')+'</button>');
+  s('wel-go',tx('Empezar →','Start →'));
+  s('wel-foot',tx('Stash reparte tu plata con la regla <b>20/50/30</b>: el ahorro sale primero, luego lo esencial, luego los gustos. Es la 50/30/20 de Harvard (Elizabeth Warren), volteada para <b>pagarte a ti primero</b>.',
+    'Stash splits your money with the <b>20/50/30</b> rule: savings come out first, then essentials, then wants. It\'s Harvard\'s 50/30/20 (Elizabeth Warren), flipped so you <b>pay yourself first</b>.'));
+  document.querySelectorAll('[data-wellang]').forEach(b=>b.classList.toggle('on',b.dataset.wellang===lang));
   renderWelPeriod();
 }
 function finishOnboarding(){
+  welMonto=parseFloat((document.getElementById('wel-monto')||{}).value)||0;
   let start='', end='', type=welMode;
   if(welMode==='m'||welMode==='q'){
     const mv=(document.getElementById('wel-month')||{}).value||welMonth;
@@ -2852,20 +2959,26 @@ function finishOnboarding(){
     start=(document.getElementById('wel-from')||{}).value||'';
     end=(document.getElementById('wel-to')||{}).value||'';
   }
-  cycles=[{id:'c1',type:type,start:start,end:end,label:'Ciclo 1'}];saveCycles();
+  cycles=[{id:'c1',type:type,start:start,end:end,label:tx('Ciclo 1','Cycle 1')}];saveCycles();
   activeQ='c1';localStorage.setItem('midas_active_cycle',activeQ);localStorage.setItem('midas_onboarded','1');
-  d=def(); d.inc=[{l:'Presupuesto',a:welMonto}]; save();
-  showWelcome(false);view='inicio';incEdit=false;render();renderDebts();window.scrollTo({top:0});
+  d=def(); d.inc=[{l:tx('Presupuesto','Budget'),a:welMonto}]; save();
+  showWelcome(false);view='inicio';incEdit=false;applyLang();window.scrollTo({top:0});
 }
 document.getElementById('welcome').addEventListener('click',e=>{
-  if(e.target.closest('[data-welnext]')){welNext();return;}
+  const lg=e.target.closest('[data-wellang]'); if(lg){setLang(lg.dataset.wellang);applyWelcomeLang();return;}
   const md=e.target.closest('[data-welmode]'); if(md){welMode=md.dataset.welmode;renderWelPeriod();return;}
   const hf=e.target.closest('[data-welhalf]'); if(hf){welHalf=+hf.dataset.welhalf;renderWelPeriod();return;}
   if(e.target.closest('[data-finishonb]'))finishOnboarding();
 });
 
-if(isFirstRun()){showWelcome(true);}
+if(isFirstRun()){
+  // Una sola tarjeta: monto + periodo juntos → el selector de periodo se pinta de entrada.
+  const t=new Date(); welMonth=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0');
+  applyWelcomeLang();
+  showWelcome(true);
+}
 else{render();renderDebts();}
+applyLang(); // fija los textos estáticos (tabs, FAB) al idioma guardado desde el primer pintado
 
 // PWA: registrar el service worker para que la app abra offline e instale en el teléfono.
 // Solo aplica servida por http(s). En el escritorio (pywebview en 127.0.0.1) no estorba:
