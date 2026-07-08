@@ -565,6 +565,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 /* Banners de frontera de ciclo (cierre pendiente / ciclo cerrado) */
 .close-banner{display:flex; align-items:center; gap:.55rem; flex-wrap:wrap; background:var(--line2); border:1.5px solid var(--accent); border-radius:var(--rad-sm); padding:.7rem .85rem; margin:.6rem 0 .2rem; font-size:12.5px; color:var(--tx); line-height:1.4}
 .close-banner .cb-btn{margin-left:auto; font:inherit; font-size:12.5px; font-weight:700; color:#fff; background:var(--accent); border:none; border-radius:8px; padding:.45rem .7rem; cursor:pointer; white-space:nowrap}
+.close-banner .cb-later{font:inherit; font-size:12px; color:var(--tx3); background:transparent; border:none; cursor:pointer; text-decoration:underline; padding:.3rem .2rem}
 .closed-banner{background:var(--line2); border-left:3px solid var(--ok); border-radius:var(--rad-sm); padding:.55rem .85rem; margin:.6rem 0 .2rem; font-size:12.5px; color:var(--tx2)}
 .closed-banner b{color:var(--tx)}
 /* Plata extra: botón de la jugada recomendada + las 4 opciones manuales */
@@ -1136,6 +1137,19 @@ function exportData(){
   const data={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.indexOf('midas_')===0)data[k]=localStorage.getItem(k);}
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='stash-backup.json';document.body.appendChild(a);a.click();a.remove();
+  localStorage.setItem('midas_last_backup',isoToday()); // sella la fecha → apaga el recordatorio 14 días
+  if(typeof render==='function')render();
+}
+// ¿Toca recordar el respaldo? Solo si hay algo que perder: nunca respaldó (y ya tiene data real),
+// o su última copia tiene más de 14 días. "Luego" lo calla 3 días (snooze), no para siempre.
+function backupDue(){
+  if(!localStorage.getItem('midas_onboarded'))return false;
+  const snooze=localStorage.getItem('midas_backup_snooze')||'';
+  if(snooze && snooze>=isoToday())return false;
+  const last=localStorage.getItem('midas_last_backup')||'';
+  const hasData=sum(d.inc)>0 && (debts.length>0 || Object.keys(d.itemPaid||{}).length>0 || cycles.length>1);
+  if(!last)return hasData;
+  return (dateVal(isoToday())-dateVal(last))/864e5 > 14;
 }
 function importData(file){
   const r=new FileReader();
@@ -1806,7 +1820,9 @@ function render(){
     (d.closed?'<div class="closed-banner">✅ Ciclo cerrado'+(d.closeLog?' el '+fmtFecha(d.closeLog.fecha)+' · '+(d.closeLog.resultado>=0?'sobró <b>'+pe(d.closeLog.resultado)+'</b>':'faltó <b>'+pe(-d.closeLog.resultado)+'</b>')+(d.closeLog.destino==='fondo'?' → a tu Reserva':d.closeLog.destino==='ciclo'?' → al siguiente ciclo':d.closeLog.destino==='reserva'?' · lo cubrió tu Reserva':''):'')+'</div>':'')+
     (pcyc?(pcyc.id===activeQ
       ?'<div class="close-banner">📅 '+tx('Este ciclo terminó','This cycle ended')+(pcyc.end?' '+tx('el ','on ')+fmtFecha(pcyc.end):'')+'. '+tx('Ciérralo para pasar su resultado al siguiente.','Close it to carry its result into the next one.')+'<button class="cb-btn" data-gocierre="'+pcyc.id+'">'+tx('Cerrar ciclo →','Close cycle →')+'</button></div>'
-      :'<div class="close-banner">📅 <b>'+cycleLabel(pcyc)+'</b> '+tx('terminó','ended')+(pcyc.end?' '+tx('el ','on ')+fmtFecha(pcyc.end):'')+' '+tx('y sigue sin cerrar.','and is still open.')+'<button class="cb-btn" data-gocierre="'+pcyc.id+'">'+tx('Revisar y cerrar →','Review & close →')+'</button></div>'):'');
+      :'<div class="close-banner">📅 <b>'+cycleLabel(pcyc)+'</b> '+tx('terminó','ended')+(pcyc.end?' '+tx('el ','on ')+fmtFecha(pcyc.end):'')+' '+tx('y sigue sin cerrar.','and is still open.')+'<button class="cb-btn" data-gocierre="'+pcyc.id+'">'+tx('Revisar y cerrar →','Review & close →')+'</button></div>'):'')+
+    // Recordatorio de respaldo: los datos viven SOLO en este navegador — sin copia, un borrado los mata.
+    (backupDue()?'<div class="close-banner">🛟 '+tx('Tus datos viven solo en este navegador. Descarga tu copia de seguridad — toma 1 toque.','Your data lives only in this browser. Download your backup — it takes 1 tap.')+'<button class="cb-btn" data-export="1">⬇ '+tx('Descargar copia','Download backup')+'</button><button class="cb-later" data-backuplater="1">'+tx('luego','later')+'</button></div>':'');
   document.getElementById('app').innerHTML= bannersH +
     '<div class="sec" id="sec-inc" style="margin-top:.5rem">'+
       '<div class="hero-inc">'+
@@ -2184,6 +2200,7 @@ app.addEventListener('click',e=>{
   else if(b.dataset.collapse!==undefined){collapsed[b.dataset.collapse]=!collapsed[b.dataset.collapse];render();}
   else if(b.dataset.collapseall){const anyOpen=Object.values(collapsed).some(v=>!v);['aho','nec','luj'].forEach(g=>collapsed[g]=anyOpen);render();}
   else if(b.dataset.export){exportData();}
+  else if(b.dataset.backuplater){const d3=new Date(Date.now()+3*864e5);localStorage.setItem('midas_backup_snooze',isoOf(d3));render();} // "luego" = 3 días de silencio
   else if(b.dataset.savetpl){saveAsTemplate();}
   else if(b.dataset.tpltoggle!==undefined){tplOpen=!tplOpen;render();}
   else if(b.dataset.loadtpl!==undefined){const n=b.dataset.loadtpl;const tiene=(d.nec&&d.nec.some(r=>(parseFloat(r.a)||0)>0||(r.sub&&r.sub.length)))||(d.inc&&sum(d.inc)>0);if(!tiene||confirm(tx('¿Cargar la plantilla "'+n+'"? Reemplaza las categorías de esta quincena.','Load template "'+n+'"? It replaces this cycle\'s categories.')))applyTemplate(n);}
@@ -2990,6 +3007,10 @@ const _isLocal = ['localhost','127.0.0.1',''].includes(location.hostname);
 if('serviceWorker' in navigator && location.protocol!=='file:' && !_isLocal){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 }
+// Blindaje anti-purga: pide al navegador marcar este almacenamiento como PERSISTENTE (que no lo
+// borre por presión de espacio). En Android/Chrome instalada como PWA casi siempre se concede.
+// En iOS, agregarla a la pantalla de inicio ya la exime de la purga de 7 días de Safari.
+if(navigator.storage && navigator.storage.persist){navigator.storage.persist().catch(()=>{});}
 
 /* ===== Gestos táctiles (celular): jalar-para-refrescar + swipe entre ciclos ===== */
 (function(){
