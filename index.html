@@ -1008,7 +1008,7 @@ function createCycle(type){
   const id='c'+Date.now(), n=cycles.filter(c=>c.type===type).length+1;
   cycles.push({id,type,start,end,label:(type==='m'?'Mes ':type==='q'?'Quincena ':'Periodo ')+n});saveCycles();
   const nd=def();nd.payday=base;
-  if(typeof seedMetaQuotas==='function')seedMetaQuotas(nd); // metas con fecha: su cuota nace en cada ciclo nuevo
+  if(typeof seedMetaQuotas==='function')seedMetaQuotas(nd,{type:type,start:start}); // metas con fecha: su cuota nace en cada ciclo nuevo
   localStorage.setItem(keyFor(id),JSON.stringify(nd));
   return id;
 }
@@ -1072,13 +1072,29 @@ function wizGo(step){wizStep=Math.max(0,Math.min(step,WIZ.length-1));
   const el=document.getElementById(WIZ[wizStep]);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});}
 
 // Las categorías semilla nacen en el idioma elegido (son DATA: una vez creadas, el usuario las edita).
+// Taxonomía definida con DD (9 jul): el 95% de la gente, el 95% de las veces. La regla madre:
+// ¿la plata se queda contigo (acumulas)? → Ahorro. ¿Se va (consumes)? → Necesidades o Gustos.
+// "Deuda" no se siembra: es el bloque vivo conectado al banco de deudas (aparece solo, con Préstamo/Tarjeta).
 const def=()=>({
   month:'',
   payday:'',
   inc:[{l:tx('Sueldo / quincena','Paycheck'),a:0}],
-  nec:[{l:tx('Gastos fijos (luz, agua)','Fixed bills (utilities)'),a:0},{l:tx('Comida','Food'),a:0},{l:tx('Transporte','Transport'),a:0},{l:tx('Salud','Health'),a:0},{l:tx('Proyecto / Sueño','Project / Dream'),a:0}],
-  luj:[{l:tx('Gustos / diversión','Fun / treats'),a:0},{l:tx('Regalos / cumpleaños','Gifts / birthdays'),a:0}],
-  aho:[{l:tx('Ahorro','Savings'),a:0},{l:tx('Inversión','Investing'),a:0}]
+  nec:[
+    {l:tx('Techo (alquiler o hipoteca)','Housing (rent or mortgage)'),a:0},
+    {l:tx('Servicios','Utilities'),a:0,sub:[{l:tx('Luz','Power'),a:0},{l:tx('Agua','Water'),a:0},{l:tx('Internet','Internet'),a:0},{l:tx('Celular','Phone'),a:0},{l:tx('Gas','Gas'),a:0}]},
+    {l:tx('Comida','Food'),a:0},
+    {l:tx('Transporte','Transport'),a:0},
+    {l:tx('Salud','Health'),a:0},
+    {l:tx('Educación','Education'),a:0},
+    {l:tx('Dependientes','Dependents'),a:0}],
+  luj:[
+    {l:tx('Salidas y antojos','Eating out & treats'),a:0},
+    {l:tx('Suscripciones','Subscriptions'),a:0},
+    {l:tx('Ropa y compras','Clothes & shopping'),a:0},
+    {l:tx('Regalos y detalles','Gifts & little things'),a:0},
+    {l:tx('Eventos','Events'),a:0},
+    {l:tx('Viajes','Travel'),a:0}],
+  aho:[{l:tx('Reserva','Reserve'),a:0},{l:tx('Inversión','Investing'),a:0}]
 });
 
 function load(q){
@@ -1107,7 +1123,7 @@ function createCycleForToday(type){
   else{ if(dd<=15){start=y+'-'+pad2(m)+'-01';end=y+'-'+pad2(m)+'-15';} else {start=y+'-'+pad2(m)+'-16';end=y+'-'+pad2(m)+'-'+pad2(lastDay(y,m));} }
   const id='c'+Date.now(), n=cycles.filter(c=>c.type===type).length+1;
   cycles.push({id,type,start,end,label:(type==='m'?'Mes ':type==='q'?'Quincena ':'Periodo ')+n});saveCycles();
-  const nd=def();if(typeof seedMetaQuotas==='function')seedMetaQuotas(nd); // metas con fecha heredan su cuota
+  const nd=def();if(typeof seedMetaQuotas==='function')seedMetaQuotas(nd,{type:type,start:start}); // metas con fecha heredan su cuota
   localStorage.setItem(keyFor(id),JSON.stringify(nd));
   return id;
 }
@@ -1226,22 +1242,36 @@ function loadFondoCats(){try{const x=JSON.parse(localStorage.getItem('midas_fond
 let fondoCats=loadFondoCats();
 function saveFondoCats(){localStorage.setItem('midas_fondo_cats',JSON.stringify(fondoCats));}
 // ===== Metas con fecha (sinking fund): Navidad, cumpleaños, viaje =====
-// La meta guarda {target, hasta:'YYYY-MM'}. La app divide lo que falta entre los meses que quedan
-// → cuota mensual, y la SIEMBRA como categoría en la caja Ahorro de cada ciclo nuevo.
+// La meta guarda {target, hasta:'YYYY-MM', inicio:'YYYY-MM'}. La app divide lo que falta entre los
+// CICLOS que quedan (quincenal = 2 por mes) y siembra la cuota en la caja Ahorro de cada ciclo nuevo,
+// con contador "3/6" en el nombre. El ✓ de esa cuota viaja a la Reserva Y avanza la barra de la meta.
 function monthsUntil(ym){ // meses que quedan INCLUYENDO el actual (jul→dic = 6), mínimo 1
   if(!ym)return 1;const t=new Date(),p=ym.split('-');
   return Math.max((+p[0]-t.getFullYear())*12+(+p[1]-(t.getMonth()+1))+1,1);}
-function metaCuota(c){ // cuota mensual viva: lo que falta ÷ meses que quedan
+function monthsBetween(a,b){ // meses de a hasta b, inclusivo ('2026-07','2026-12' → 6), mínimo 1
+  if(!a||!b)return 1;const pa=a.split('-'),pb=b.split('-');
+  return Math.max((+pb[0]-+pa[0])*12+(+pb[1]-+pa[1])+1,1);}
+function metaCuota(c){ // cuota MENSUAL viva: lo que falta ÷ meses que quedan (se auto-corrige sola)
   const target=parseFloat(c.target)||0;if(target<=0)return 0;
   const falta=Math.max(target-(parseFloat(c.a)||0),0);
   return Math.ceil(falta/monthsUntil(c.hasta));}
-function seedMetaQuotas(x){ // siembra la cuota de cada meta viva en la caja Ahorro de un presupuesto NUEVO
-  const hoy=isoToday().slice(0,7);
+function metaBase(l){return (l||'').replace(/\s·\s\d+\/\d+$/,'').trim().toLowerCase();} // "Navidad · 3/6" → "navidad"
+function metaFor(lbl){const b=metaBase(lbl);if(!b)return null;
+  return fondoCats.find(c=>(parseFloat(c.target)>0)&&(c.n||'').trim().toLowerCase()===b)||null;}
+// Siembra la cuota de cada meta viva en la caja Ahorro de un presupuesto. cyc = {type,start} del ciclo
+// destino: quincenal parte la cuota mensual en 2 y el contador cuenta medias-lunas (1/12 en vez de 1/6).
+function seedMetaQuotas(x,cyc){
+  const c0=cyc||cycleOf(activeQ)||{};
+  const per=(c0.type==='q')?2:1;
+  const ym=(c0.start||isoToday()).slice(0,7);
+  const dd=+((c0.start||isoToday()).split('-')[2]||1);
   fondoCats.forEach(c=>{
-    if(!(parseFloat(c.target)>0)||!c.hasta||c.hasta<hoy)return; // sin fecha, vencida o sin objetivo → no
-    const cuota=metaCuota(c);if(cuota<=0)return;
-    if((x.aho||[]).some(r=>(r.l||'').trim().toLowerCase()===(c.n||'').trim().toLowerCase()))return; // ya está
-    x.aho.push({l:c.n,a:cuota});
+    if(!(parseFloat(c.target)>0)||!c.hasta||c.hasta<ym)return; // sin fecha, vencida o sin objetivo → no
+    const cuotaMes=metaCuota(c);if(cuotaMes<=0)return; // ya completa
+    if((x.aho||[]).some(r=>metaBase(r.l)===(c.n||'').trim().toLowerCase()))return; // ya está en este ciclo
+    const N=monthsBetween(c.inicio||ym,c.hasta)*per;
+    const idx=Math.min((monthsBetween(c.inicio||ym,ym)-1)*per+(per===2&&dd>15?2:1),N);
+    x.aho.push({l:c.n+' · '+idx+'/'+N,a:Math.ceil(cuotaMes/per)});
   });
   return x;
 }
@@ -1316,7 +1346,8 @@ function openMetaModal(){
   const prev=()=>{const a=parseFloat((document.getElementById('mg-amt')||{}).value)||0;
     const m=(document.getElementById('mg-mes')||{}).value||defMes;
     const p=document.getElementById('mg-preview');if(!p)return;
-    p.innerHTML=a>0?tx('Te tocan','That\'s')+' <b>'+pe(Math.ceil(a/monthsUntil(m)))+tx('/mes','/mo')+'</b> '+tx('desde este ciclo.','starting this cycle.'):'';};
+    const per=(cycleOf(activeQ).type==='q')?2:1, N=monthsUntil(m)*per;
+    p.innerHTML=a>0?tx('Te tocan','That\'s')+' <b>'+pe(Math.ceil(a/monthsUntil(m)/per))+'</b> '+tx('por ciclo','per cycle')+' <b>(1/'+N+')</b> '+tx('desde este ciclo.','starting this cycle.'):'';};
   el.addEventListener('input',prev);
   setTimeout(()=>{const i=document.getElementById('mg-name');if(i)i.focus();},60);
 }
@@ -1329,8 +1360,8 @@ function openMetaModal(){
     const mes=(document.getElementById('mg-mes')||{}).value||'';
     if(!name||amt<=0||!mes){const i=document.getElementById(!name?'mg-name':'mg-amt');if(i)i.focus();return;}
     snapshot();
-    fondoCats.push({n:name,a:'',target:amt,hasta:mes});saveFondoCats();
-    seedMetaQuotas(d);save(); // la cuota entra YA a la caja Ahorro de este ciclo
+    fondoCats.push({n:name,a:'',target:amt,hasta:mes,inicio:isoToday().slice(0,7)});saveFondoCats();
+    seedMetaQuotas(d,cycleOf(activeQ));save(); // la cuota entra YA a la caja Ahorro de este ciclo
     ov.hidden=true;refreshFondo();render();
   });
 })();
@@ -1866,6 +1897,7 @@ function bucketH(g,name,pct,num){
       (g==='aho'?ahoDebtBlockH():'')+ // Deuda arriba → las categorías nuevas caen ABAJO (al final)
       rows+
       '<button class="add" data-add="'+g+'"><span class="p">+</span> '+tx('Agregar categoría','Add category')+'</button>'+ // también en Ahorro
+      (g==='aho'?'<button class="add" data-metadate="1"><span class="p">🎂</span> '+tx('Apartar para una fecha (Navidad, viaje…)','Set aside for a date (Christmas, trip…)')+'</button>':'')+
     '</div>'+
     wizBtn+'</div>';
 }
@@ -2279,6 +2311,7 @@ app.addEventListener('click',e=>{
   else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
   else if(b.dataset.cerrar){openCierre();}
   else if(b.dataset.wfopen){openWindfall();}
+  else if(b.dataset.metadate){openMetaModal();} // 🎂 desde la caja Ahorro — mismo modal que en Reserva
   else if(b.dataset.cubredef){snapshot();injectPlata(+b.dataset.cubredef);save();render();renderDebts();} // plata en mano → ingreso del plan (nace recibida)
   else if(b.dataset.asignar){const pp=b.dataset.asignar.split('-');asignaEnCategoria(pp[0],+pp[1]);}
   else if(b.dataset.asignalisto){asignaListo();}
@@ -2336,15 +2369,20 @@ app.addEventListener('click',e=>{
     if(k.indexOf('aho-')===0 && !d.itemPaid[k]){ // marcando
       const amt=ahoKeyAmount(k);
       if(amt>0.5){
-        const catLbl=((d.aho[+k.split('-')[1]]||{}).l||'').trim().toLowerCase();
-        if(/^(ahorro|inversi[oó]n)$/.test(catLbl)){ // conocida → Reserva directo, sin preguntar
+        const rawLbl=((d.aho[+k.split('-')[1]]||{}).l||'');
+        const catLbl=rawLbl.trim().toLowerCase();
+        const meta=(typeof metaFor==='function')?metaFor(rawLbl):null; // ¿es la cuota de una meta con fecha?
+        if(/^(ahorro|inversi[oó]n|reserva|reserve|savings|investing)$/.test(catLbl)||meta){ // conocida o meta → Reserva directo
           snapshot(); if(!d.ahoMoved)d.ahoMoved={}; d.ahoMoved[k]=amt;
           fondo+=amt; saveFondo(); addResLog(amt,ahoKeyLabel(k));
+          if(meta){meta.a=(parseFloat(meta.a)||0)+amt;saveFondoCats();} // la barra de la meta avanza sola
         } else { askAhoDestino(k,amt); return; } // creada → pregunta; el overlay marca y aplica
       }
     } else if(k.indexOf('aho-')===0){ // destildando → si viajó a la Reserva la devuelve exacto
       const amt=(d.ahoMoved&&d.ahoMoved[k])||0;
-      if(amt>0.5){snapshot();fondo-=amt;saveFondo();addResLog(-amt,ahoKeyLabel(k)+' · deshecho');}
+      if(amt>0.5){snapshot();fondo-=amt;saveFondo();addResLog(-amt,ahoKeyLabel(k)+' · deshecho');
+        const meta=(typeof metaFor==='function')?metaFor(((d.aho[+k.split('-')[1]]||{}).l||'')):null;
+        if(meta){meta.a=Math.max((parseFloat(meta.a)||0)-amt,0);saveFondoCats();}} // la meta retrocede exacto
       if(d.ahoMoved)delete d.ahoMoved[k];
     }
     commitItemPaid(k);}
@@ -2355,7 +2393,9 @@ app.addEventListener('click',e=>{
     // del ejecutado y ajusta bancoTotal), a la Reserva si era un ahorro que viajó (ahoMoved), y al
     // contador si era un ingreso ya recibido (incGot). "Me equivoqué" no puede costar plata.
     const revertAho=keys=>{keys.forEach(k=>{const amt=(d.ahoMoved&&d.ahoMoved[k])||0;
-      if(amt>0.5){fondo-=amt;saveFondo();addResLog(-amt,ahoKeyLabel(k)+tx(' · borrado',' · deleted'));}});};
+      if(amt>0.5){fondo-=amt;saveFondo();addResLog(-amt,ahoKeyLabel(k)+tx(' · borrado',' · deleted'));
+        const meta=(typeof metaFor==='function')?metaFor(((d.aho[+k.split('-')[1]]||{}).l)||''):null;
+        if(meta){meta.a=Math.max((parseFloat(meta.a)||0)-amt,0);saveFondoCats();}}});};
     if(b.dataset.sub!==undefined){
       const j=+b.dataset.sub;
       if(g==='aho')revertAho([g+'-'+i+'-'+j]);
