@@ -1679,17 +1679,28 @@ function openGasto(){
     const name=(desc||tx('Gasto','Expense'))+' · '+dueLabel(fecha);
     const g='nec';
     snapshot();
-    // busca (o crea) la categoría "Gastos" (acepta la vieja "Sueltos" de datos existentes)
-    let ci=(d[g]||[]).findIndex(r=>/^(gastos?|sueltos?|loose|expenses?)$/i.test((r.l||'').trim()));
-    if(ci<0){d[g].push({l:tx('Gastos','Expenses'),a:0,sub:[]});ci=d[g].length-1;}
-    const cat=d[g][ci];
-    if(!cat.sub)cat.sub=[];
-    // si la categoría tenía monto plano sin subs, se preserva como primera sub (a pasará a ser sum(sub))
-    if(cat.sub.length===0&&(parseFloat(cat.a)||0)>0)cat.sub.push({l:tx('Anterior','Previous'),a:cat.a});
-    cat.sub.push({l:name,a:amt});
-    cat.a=sum(cat.sub);
+    if(!d.itemPaid)d.itemPaid={};
+    // TODO EN UNA SOLA FOTO (cashDelta): agregar el monto Y marcarlo. Si se muta la categoría FUERA
+    // y el padre ya estaba ✓ (todas las subs pagadas), el ejecutado ya contaba el monto nuevo antes
+    // de medir → dif=0 → el contador no bajaba (bug real de DD: 2do gasto a "Sueltos" no descontaba).
+    cashDelta(()=>{
+      // busca (o crea) la categoría "Gastos" (acepta la vieja "Sueltos" de datos existentes)
+      let ci=(d[g]||[]).findIndex(r=>/^(gastos?|sueltos?|loose|expenses?)$/i.test((r.l||'').trim()));
+      if(ci<0){d[g].push({l:tx('Gastos','Expenses'),a:0,sub:[]});ci=d[g].length-1;}
+      const cat=d[g][ci];
+      if(!cat.sub)cat.sub=[];
+      // si la categoría tenía monto plano sin subs, se preserva como primera sub (a pasará a ser sum(sub))
+      if(cat.sub.length===0&&(parseFloat(cat.a)||0)>0)cat.sub.push({l:tx('Anterior','Previous'),a:cat.a});
+      cat.sub.push({l:name,a:amt});
+      cat.a=sum(cat.sub);
+      const k=g+'-'+ci+'-'+(cat.sub.length-1);
+      d.itemPaid[k]=true; // nace con ✓
+      // cascada del padre, igual que commitItemPaid: todas ✓ → padre ✓; si no, padre fuera
+      if(cat.sub.every((s,j)=>d.itemPaid[g+'-'+ci+'-'+j]))d.itemPaid[g+'-'+ci]=true;
+      else delete d.itemPaid[g+'-'+ci];
+    });
     ov.hidden=true;
-    commitItemPaid(g+'-'+ci+'-'+(cat.sub.length-1)); // nace con ✓ → cascada + contador vivo, y re-render
+    save();render();
   });
 })();
 let asigna=null; // modo "mándalo a un lugar específico": {pool, orig} mientras repartes en las cajas
