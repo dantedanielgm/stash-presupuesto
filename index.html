@@ -1550,6 +1550,7 @@ let wf=null; // {extra, plan}
 // Aplica el toggle del ✓ (categoría o subcategoría) + la cascada padre/subs, ajustando el contador vivo
 // por la diferencia exacta (cashDelta). Lo usan tanto el click directo como el mini-modal de Ahorro.
 function commitItemPaid(k){
+  if(!d.itemPaid)d.itemPaid={}; // ciclo virgen: el primer ✓ puede llegar por CUALQUIER camino (gasto suelto incluido)
   cashDelta(()=>{
     if(d.itemPaid[k])delete d.itemPaid[k];else d.itemPaid[k]=true;
     // Sub (g-i-j): si TODAS las subs quedan ✓, el padre se marca solo; si desmarco una, el padre se desmarca.
