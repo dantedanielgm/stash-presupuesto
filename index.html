@@ -733,6 +733,21 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 #settingsbtn{position:absolute; top:0; right:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:transparent; cursor:pointer; font-size:16px; line-height:1; color:var(--tx2); transition:.15s}
 #settingsbtn:hover{border-color:var(--accent); color:var(--accent); transform:rotate(30deg)}
 .set-h{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--tx3); margin:1rem 0 .45rem}
+/* Vista macro del año (tocar la fecha de arriba) */
+.yr-head{display:flex; align-items:center; justify-content:center; gap:.8rem}
+.yr-nav{font:inherit; font-size:18px; background:transparent; border:1px solid var(--line); border-radius:8px; width:32px; height:32px; cursor:pointer; color:var(--tx2); line-height:1}
+.yr-nav:hover{border-color:var(--accent); color:var(--accent)}
+.yr-month{display:flex; align-items:center; gap:.6rem; padding:.42rem 0; border-bottom:1px solid var(--line2)}
+.yr-month.yr-now .yr-mn{color:var(--accent); font-weight:800}
+.yr-mn{width:40px; font-size:12.5px; font-weight:700; color:var(--tx2); flex:none}
+.yr-cycles{display:flex; flex-wrap:wrap; gap:.35rem; flex:1; min-width:0}
+.yr-chip{font:inherit; font-size:11.5px; font-weight:700; border:1.5px solid var(--line); background:transparent; color:var(--tx); border-radius:999px; padding:.3rem .55rem; cursor:pointer}
+.yr-chip.yr-encurso{border-color:var(--accent); color:var(--accent)}
+.yr-chip.yr-futuro{opacity:.8}
+.yr-chip.yr-cerrado{opacity:.55}
+.yr-chip.yr-vencido{border-color:var(--bad); color:var(--bad)}
+.yr-chip.yr-active{background:var(--line2)}
+.yr-empty{color:var(--tx3); font-size:12px}
 /* Cada caja del 50/30/20 vive en un contenedor de su color — se distingue de un vistazo qué número es de qué */
 .sec-tint{border-radius:var(--rad); border:1px solid; padding:1rem .9rem 1.05rem; margin-top:1.2rem}
 #sec-aho.sec-tint{background:rgba(52,199,89,.07); border-color:rgba(52,199,89,.32)}
@@ -813,6 +828,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 <div id="gasto-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="gasto-card"></div></div>
 <div id="meta-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="meta-card"></div></div>
 <div id="settings-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="settings-card"></div></div>
+<div id="year-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="year-card"></div></div>
 <input type="file" id="importfile" accept="application/json,.json" hidden>
 <button id="fab-gasto" class="fab-gasto" title="Anotar un gasto suelto">+ Gasto</button>
 <!-- 3 tabs = el balance general: Inicio (flujo del ciclo) · Deudas (pasivos) · Reserva (activos).
@@ -881,6 +897,38 @@ document.getElementById('settingsbtn').addEventListener('click',()=>{renderSetti
     else if(b.dataset.reset){if(confirm(tx('¿Reiniciar esta quincena? Se borran los montos actuales.','Reset this cycle? Current amounts will be wiped.'))){snapshot();d=def();save();render();ov.hidden=true;}}
   });})();
 document.getElementById('importfile').addEventListener('change',e=>{if(e.target.files&&e.target.files[0])importData(e.target.files[0]);});
+// ===== 📅 Vista macro del año: tocar la fecha de arriba abre los 12 meses con sus ciclos =====
+let yearView=new Date().getFullYear();
+function renderYear(){
+  const el=document.getElementById('year-card'); if(!el)return;
+  const y=yearView, hoy=isoToday(), hoyY=+hoy.slice(0,4), hoyM=+hoy.slice(5,7);
+  let h='<div class="ci-h yr-head"><button class="yr-nav" data-yrnav="-1">‹</button><span>📅 '+y+'</span><button class="yr-nav" data-yrnav="1">›</button></div>'+
+    '<div class="ci-sub">'+tx('Tu año en ciclos — toca uno para ir a él.','Your year in cycles — tap one to jump to it.')+'</div>';
+  for(let m=1;m<=12;m++){
+    const ms=y+'-'+pad2(m)+'-01', me=y+'-'+pad2(m)+'-'+pad2(lastDay(y,m));
+    const list=cycles.filter(c=>c.start&&c.end&&c.start<=me&&c.end>=ms);
+    h+='<div class="yr-month'+((y===hoyY&&m===hoyM)?' yr-now':'')+'"><span class="yr-mn">'+cap(MESESL()[m-1].slice(0,3))+'</span><span class="yr-cycles">'+
+      (list.length?list.map(c=>{
+        const st=cycleStatusOf(c.id);
+        return '<button class="yr-chip yr-'+st+(c.id===activeQ?' yr-active':'')+'" data-gocycle2="'+c.id+'" title="'+esc(cycleLabel(c))+'">'+(CYC_BADGE[st]||'')+' '+(+c.start.slice(8,10))+'–'+(+c.end.slice(8,10))+'</button>';
+      }).join(''):'<span class="yr-empty">—</span>')+
+      '</span></div>';
+  }
+  h+='<div class="ci-note" style="margin-top:.6rem">✅ '+tx('cerrado','closed')+' · 🔵 '+tx('en curso','current')+' · 📅 '+tx('vencido sin cerrar','ended, open')+' · 🔮 '+tx('futuro','future')+'</div>'+
+    '<div class="ci-btns"><button class="ci-go" data-yrclose="1">'+tx('Listo','Done')+'</button></div>';
+  el.innerHTML=h;
+}
+(function(){
+  const td=document.getElementById('today');
+  if(td){td.style.cursor='pointer';td.title=tx('Toca para ver tu año en ciclos','Tap to see your year in cycles');
+    td.addEventListener('click',()=>{yearView=new Date().getFullYear();renderYear();document.getElementById('year-ovl').hidden=false;});}
+  const ov=document.getElementById('year-ovl'); if(!ov)return;
+  ov.addEventListener('click',e=>{
+    if(e.target===ov||e.target.closest('[data-yrclose]')){ov.hidden=true;return;}
+    const nv=e.target.closest('[data-yrnav]'); if(nv){yearView+=+nv.dataset.yrnav;renderYear();return;}
+    const gc=e.target.closest('[data-gocycle2]'); if(gc){ov.hidden=true;switchCycle(gc.dataset.gocycle2);window.scrollTo({top:0,behavior:'smooth'});}
+  });
+})();
 // Idioma: re-pinta lo estático (tabs, FAB, botones de cabecera) y re-renderiza todo lo dinámico.
 function applyLang(){
   const q=(sel,t)=>{const e=document.querySelector(sel);if(e)e.textContent=t;};
@@ -890,7 +938,7 @@ function applyLang(){
   q('[data-view="informe"] span:last-child',tx('Informe','Report'));
   q('#fab-gasto',tx('+ Gasto','+ Expense'));
   q('#undo','↰ '+tx('Deshacer','Undo'));
-  const td=document.getElementById('today');if(td)td.textContent=fmtFechaLarga(isoToday())+(lang==='en'?', ':' ')+new Date().getFullYear();
+  const td=document.getElementById('today');if(td)td.textContent=fmtFechaLarga(isoToday())+(lang==='en'?', ':' ')+new Date().getFullYear()+' ▾';
   if(typeof renderCycleBar==='function')renderCycleBar();
   if(typeof render==='function'&&typeof d!=='undefined')render();
   if(typeof renderDebts==='function')renderDebts();
@@ -1999,7 +2047,7 @@ function syncParents(){
 function render(){
   syncParents();
   document.getElementById('month').value=d.month||'';
-  {const _td=document.getElementById('today');if(_td)_td.textContent=fmtFechaLarga(isoToday())+' '+new Date().getFullYear();}
+  {const _td=document.getElementById('today');if(_td)_td.textContent=fmtFechaLarga(isoToday())+(lang==='en'?', ':' ')+new Date().getFullYear()+' ▾';}
   // sincronizar botones de tab
   renderCycleBar();
   let incRows=d.inc.map((r,i)=>rowH('inc',i,r)).join('');
