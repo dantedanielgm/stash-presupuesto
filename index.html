@@ -979,7 +979,10 @@ function cycEditH(c){
     '<button class="ce-done" data-cyceditdone="1">'+tx('Listo','Done')+'</button>'+
   '</div>';
 }
-function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);sanitizePaid();showRollover=true;
+function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);sanitizePaid();
+  // Ciclos futuros que ya existían cuando nació la meta también heredan su cuota (al visitarlos)
+  if(!d.closed&&typeof seedMetaQuotas==='function'&&seedMetaQuotas(d,cycleOf(activeQ)))save();
+  showRollover=true;
   // se mantiene la tab actual (Inicio/Resumen/Deudas/Invertir) al cambiar de ciclo — no resetear a Inicio
   localStorage.setItem('midas_active_cycle',activeQ);history=[];render();renderDebts();updateUndo();}
 // createCycle: crea el ciclo y devuelve su id SIN cambiar a él (el cierre lo usa para escribir
@@ -1251,29 +1254,59 @@ function monthsUntil(ym){ // meses que quedan INCLUYENDO el actual (jul→dic = 
 function monthsBetween(a,b){ // meses de a hasta b, inclusivo ('2026-07','2026-12' → 6), mínimo 1. Acepta fecha completa.
   if(!a||!b)return 1;const pa=String(a).slice(0,7).split('-'),pb=String(b).slice(0,7).split('-');
   return Math.max((+pb[0]-+pa[0])*12+(+pb[1]-+pa[1])+1,1);}
-function metaCuota(c){ // cuota MENSUAL viva: lo que falta ÷ meses que quedan (se auto-corrige sola)
-  const target=parseFloat(c.target)||0;if(target<=0)return 0;
-  const falta=Math.max(target-(parseFloat(c.a)||0),0);
-  return Math.ceil(falta/monthsUntil(c.hasta));}
+function metaHasta(c){const h=String(c.hasta||'');return h.length>7?h:(h?h+'-31':'');} // legacy 'YYYY-MM' → fin de mes
 function metaBase(l){return (l||'').replace(/\s·\s\d+\/\d+$/,'').trim().toLowerCase();} // "Navidad · 3/6" → "navidad"
 function metaFor(lbl){const b=metaBase(lbl);if(!b)return null;
   return fondoCats.find(c=>(parseFloat(c.target)>0)&&(c.n||'').trim().toLowerCase()===b)||null;}
+// ===== Cuota por CICLOS REALES (no por meses de calendario) =====
+// La cuota se divide entre los ciclos que DE VERDAD te quedan hasta la fecha: primero mira tu
+// calendario real de ciclos (la barra); si aún no existen tan lejos, aproxima por medias-lunas.
+function slotIndex(dateISO,per){const p=String(dateISO).split('-'),y=+p[0],m=+p[1],dd=+(p[2]||1);
+  return per===2?(y*12+(m-1))*2+(dd>15?1:0):y*12+(m-1);}
+function slotsBetween(a,b,per){return Math.max(slotIndex(b,per)-slotIndex(a,per)+1,1);}
+function metaSlots(fromISO,hasta,per){ // nº de ciclos desde el ciclo que EMPIEZA en fromISO hasta la fecha meta
+  const from=String(fromISO||isoToday()), hs=String(hasta);
+  const reales=cycles.filter(c=>c.start&&c.start>=from.slice(0,10)&&c.start<=hs);
+  if(reales.length)return reales.length;
+  return slotsBetween(from,hs,per);
+}
 // Siembra la cuota de cada meta viva en la caja Ahorro de un presupuesto. cyc = {type,start} del ciclo
 // destino: quincenal parte la cuota mensual en 2 y el contador cuenta medias-lunas (1/12 en vez de 1/6).
 function seedMetaQuotas(x,cyc){
   const c0=cyc||cycleOf(activeQ)||{};
   const per=(c0.type==='q')?2:1;
-  const ym=(c0.start||isoToday()).slice(0,7);
-  const dd=+((c0.start||isoToday()).split('-')[2]||1);
+  const start=(c0.start||isoToday());
+  let changed=false;
   fondoCats.forEach(c=>{
-    if(!(parseFloat(c.target)>0)||!c.hasta||String(c.hasta).slice(0,7)<ym)return; // sin fecha, vencida o sin objetivo → no
-    const cuotaMes=metaCuota(c);if(cuotaMes<=0)return; // ya completa
-    if((x.aho||[]).some(r=>metaBase(r.l)===(c.n||'').trim().toLowerCase()))return; // ya está en este ciclo
-    const N=monthsBetween(c.inicio||ym,c.hasta)*per;
-    const idx=Math.min((monthsBetween(c.inicio||ym,ym)-1)*per+(per===2&&dd>15?2:1),N);
-    x.aho.push({l:c.n+' · '+idx+'/'+N,a:Math.ceil(cuotaMes/per)});
+    if(!(parseFloat(c.target)>0)||!c.hasta)return;
+    const hs=metaHasta(c);
+    if(hs<start.slice(0,10))return; // este ciclo arranca DESPUÉS de la fecha meta → ya no toca
+    let falta=Math.max((parseFloat(c.target)||0)-(parseFloat(c.a)||0),0);
+    if(falta<=0.5)return; // completa
+    // Descuenta lo ya COMPROMETIDO en ciclos anteriores (cuotas sembradas, aún sin ✓): si agosto-1
+    // ya planifica 333, agosto-2 no debe cargar con esos 333 otra vez.
+    const base=(metaBase(c.n));
+    cycles.forEach(cc=>{ if(!cc.start||cc.start>=start.slice(0,10))return;
+      if(c.inicio&&cc.start<String(c.inicio).slice(0,10))return; // antes de que naciera la meta no hay cuotas
+      const bx=(cc.id===activeQ&&typeof d!=='undefined')?d:load(cc.id);
+      const ri=(bx.aho||[]).findIndex(rr=>metaBase(rr.l)===base);
+      if(ri>=0&&!(bx.itemPaid&&bx.itemPaid['aho-'+ri]))falta=Math.max(falta-(parseFloat(bx.aho[ri].a)||0),0);
+    });
+    if(falta<=0.5)return; // lo que falta ya está repartido en los ciclos previos
+    const rest=metaSlots(start,hs,per);            // ciclos que DE VERDAD quedan (este incluido)
+    const N=metaSlots(c.inicio||start,hs,per);     // ciclos totales del plan (desde que nació la meta)
+    const idx=Math.max(Math.min(N-rest+1,N),1);
+    const cuota=Math.ceil(falta/rest), lbl=c.n+' · '+idx+'/'+N;
+    const exIdx=(x.aho||[]).findIndex(r=>metaBase(r.l)===(c.n||'').trim().toLowerCase());
+    if(exIdx>=0){ // ya sembrada: si aún no tiene ✓, la cuota se REFRESCA al valor vivo (lo que falta ÷ lo que queda)
+      if(!(x.itemPaid&&x.itemPaid['aho-'+exIdx]) && (x.aho[exIdx].a!==cuota||x.aho[exIdx].l!==lbl)){
+        x.aho[exIdx].a=cuota;x.aho[exIdx].l=lbl;changed=true;}
+      return;
+    }
+    x.aho.push({l:lbl,a:cuota});
+    changed=true;
   });
-  return x;
+  return changed;
 }
 function fondoH(){
   // Reserva = tus ACTIVOS, leídos como escalera de 3 pisos: Colchón (protege) → Metas (ilusiona)
@@ -1298,13 +1331,16 @@ function fondoH(){
       '<div class="ftc-l">'+pe(Math.max(sin,0))+(target>0?' '+tx('de','of')+' '+pe(target)+' <span style="color:var(--tx3)">'+tx('(≈3 meses de tus necesidades)','(≈3 months of your needs)')+'</span>':'')+(sin<-0.5?' — <span class="neg">'+tx('asignaste a metas más de lo que tienes','you assigned more to goals than you have')+'</span>':'')+'</div>'+
       '<div class="ft-piso"><span class="ftp-n">2</span> '+tx('Metas','Goals')+' <span class="ft-hint">'+tx('sueños con nombre — la cuota de esperanza','dreams with a name — the hope installment')+'</span></div>'+
       fondoCats.map((c,i)=>{
-        const target=parseFloat(c.target)||0, cuota=metaCuota(c);
+        const target=parseFloat(c.target)||0;
+        const cyc0=cycleOf(activeQ)||{}, per0=(cyc0.type==='q')?2:1;
+        const falta=Math.max(target-(parseFloat(c.a)||0),0);
+        const cuota=(target>0&&falta>0.5&&c.hasta)?Math.ceil(falta/metaSlots(cyc0.start||isoToday(),metaHasta(c),per0)):0;
         const prog=target>0?Math.min((parseFloat(c.a)||0)/target*100,100):0;
         return '<div class="ft-cat"><input class="ftc-n" data-ftc="'+i+'" data-ff="n" value="'+esc(c.n||'')+'" placeholder="'+tx('Ej. Emergencia, Auto, Viaje','E.g. Emergency, Car, Trip')+'"><span class="ftc-a">S/ <input data-ftc="'+i+'" data-ff="a" type="number" min="0" step="1" value="'+(c.a!=null?c.a:'')+'" placeholder="0"></span><button class="ftc-rm" data-ftcrm="'+i+'" aria-label="'+tx('Quitar','Remove')+'">&times;</button></div>'+
           // Meta con fecha: barra de avance + la cuota viva ("aparta S/X/mes hasta dic")
           (target>0?'<div class="ftc-bar ft-goalbar"><div class="ftc-fill" style="width:'+prog+'%"></div></div>'+
             '<div class="ft-goal">'+pe(parseFloat(c.a)||0)+' '+tx('de','of')+' '+pe(target)+
-            (cuota>0&&c.hasta?' · '+tx('aparta','set aside')+' <b>'+pe(cuota)+tx('/mes','/mo')+'</b> '+tx('hasta el','until')+' '+(String(c.hasta).length>7?dueLabel(c.hasta):cap((lang==='en'?MESES_EN:MESES_ES)[(+String(c.hasta).split('-')[1])-1].slice(0,3)))+' '+String(c.hasta).split('-')[0]:(cuota<=0?' · ✅ '+tx('¡completa!','done!'):''))+'</div>':'');
+            (cuota>0&&c.hasta?' · '+tx('aparta','set aside')+' <b>'+pe(cuota)+' '+tx('por ciclo','per cycle')+'</b> '+tx('hasta el','until')+' '+dueLabel(metaHasta(c))+' '+String(c.hasta).split('-')[0]:(cuota<=0&&target>0?' · ✅ '+tx('¡completa!','done!'):''))+'</div>':'');
       }).join('')+
       '<button class="add" data-ftadd="1"><span class="p">+</span> '+tx('Agregar meta','Add goal')+'</button>'+
       '<button class="add" data-ftdate="1"><span class="p">🎂</span> '+tx('Meta con fecha (Navidad, cumple…)','Goal with a date (Christmas, birthday…)')+'</button>'+
@@ -1346,8 +1382,9 @@ function openMetaModal(){
   const prev=()=>{const a=parseFloat((document.getElementById('mg-amt')||{}).value)||0;
     const m=(document.getElementById('mg-mes')||{}).value||defMes;
     const p=document.getElementById('mg-preview');if(!p)return;
-    const per=(cycleOf(activeQ).type==='q')?2:1, N=monthsUntil(m)*per;
-    p.innerHTML=a>0?tx('Te tocan','That\'s')+' <b>'+pe(Math.ceil(a/monthsUntil(m)/per))+'</b> '+tx('por ciclo','per cycle')+' <b>(1/'+N+')</b> '+tx('desde este ciclo.','starting this cycle.'):'';};
+    const cyc=cycleOf(activeQ)||{}, per=(cyc.type==='q')?2:1;
+    const rest=metaSlots(cyc.start||isoToday(),m.length>7?m:m+'-31',per); // ciclos REALES que quedan
+    p.innerHTML=a>0?tx('Te tocan','That\'s')+' <b>'+pe(Math.ceil(a/rest))+'</b> '+tx('por ciclo','per cycle')+' <b>(1/'+rest+')</b> '+tx('desde este ciclo.','starting this cycle.'):'';};
   el.addEventListener('input',prev);
   setTimeout(()=>{const i=document.getElementById('mg-name');if(i)i.focus();},60);
 }
@@ -1360,7 +1397,8 @@ function openMetaModal(){
     const mes=(document.getElementById('mg-mes')||{}).value||'';
     if(!name||amt<=0||!mes){const i=document.getElementById(!name?'mg-name':'mg-amt');if(i)i.focus();return;}
     snapshot();
-    fondoCats.push({n:name,a:'',target:amt,hasta:mes,inicio:isoToday().slice(0,7)});saveFondoCats();
+    // inicio = el ARRANQUE del ciclo donde nace la meta (ancla el contador k/N a tus ciclos reales)
+    fondoCats.push({n:name,a:'',target:amt,hasta:mes,inicio:(cycleOf(activeQ)||{}).start||isoToday()});saveFondoCats();
     seedMetaQuotas(d,cycleOf(activeQ));save(); // la cuota entra YA a la caja Ahorro de este ciclo
     ov.hidden=true;refreshFondo();render();
   });
