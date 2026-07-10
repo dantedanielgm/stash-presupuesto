@@ -205,7 +205,9 @@ body.focuson .reset{display:none}
 /* Ingreso hero (lo primero y más grande del home) */
 .hero-inc{text-align:center; padding:.4rem 0 1.1rem}
 .hi-lbl{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--tx3); margin-bottom:.15rem}
-.hi-num{font-size:42px; font-weight:800; letter-spacing:-.03em; line-height:1; color:var(--tx); font-variant-numeric:tabular-nums}
+.hi-num{font-size:42px; font-weight:800; letter-spacing:-.03em; line-height:1; color:var(--tx); font-variant-numeric:tabular-nums; cursor:pointer; -webkit-tap-highlight-color:transparent}
+.hi-num:active{opacity:.75}
+.hi-chev{font-size:15px; font-weight:400; color:var(--tx3); margin-left:.4rem; vertical-align:middle}
 /* La realidad en el hero: en mano (editable) + en camino + chip contextual */
 .hi-mano{margin-top:.7rem; font-size:14px; font-weight:600; color:var(--tx2); display:inline-flex; align-items:center; gap:.15rem; flex-wrap:wrap; justify-content:center}
 .hi-mano input{width:88px; font:inherit; font-size:18px; font-weight:800; color:var(--tx); text-align:right; background:transparent; border:none; border-bottom:1.5px dashed var(--line); padding:0 2px}
@@ -728,8 +730,9 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .ce-done:hover{filter:brightness(1.08)}
 #themebtn{position:absolute; top:0; right:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:transparent; cursor:pointer; font-size:15px; line-height:1; transition:.15s}
 #themebtn:hover{border-color:var(--accent)}
-#langbtn{position:absolute; top:0; right:42px; height:34px; border-radius:999px; border:1px solid var(--line); background:transparent; cursor:pointer; font:inherit; font-size:11.5px; font-weight:800; letter-spacing:.04em; padding:0 .7rem; color:var(--tx2); transition:.15s}
-#langbtn:hover{border-color:var(--accent); color:var(--accent)}
+#settingsbtn{position:absolute; top:0; right:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:transparent; cursor:pointer; font-size:16px; line-height:1; color:var(--tx2); transition:.15s}
+#settingsbtn:hover{border-color:var(--accent); color:var(--accent); transform:rotate(30deg)}
+.set-h{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--tx3); margin:1rem 0 .45rem}
 /* Cada caja del 50/30/20 vive en un contenedor de su color — se distingue de un vistazo qué número es de qué */
 .sec-tint{border-radius:var(--rad); border:1px solid; padding:1rem .9rem 1.05rem; margin-top:1.2rem}
 #sec-aho.sec-tint{background:rgba(52,199,89,.07); border-color:rgba(52,199,89,.32)}
@@ -798,8 +801,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
   <span class="month-wrap" style="display:none">Mes: <input id="month" placeholder="Julio 2026"></span>
   <div class="q-tabs" id="cyclebar"></div>
   <button id="undo" hidden>&#8624; Deshacer</button>
-  <button id="langbtn" title="Español / English">ES</button>
-  <button id="themebtn" title="Cambiar entre modo claro y oscuro">🌙</button>
+  <button id="settingsbtn" title="Ajustes / Settings">⚙</button>
 </div>
 <div id="app"></div>
 <div id="debts" class="debts"></div>
@@ -810,6 +812,8 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 <div id="aho-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="aho-card"></div></div>
 <div id="gasto-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="gasto-card"></div></div>
 <div id="meta-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="meta-card"></div></div>
+<div id="settings-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="settings-card"></div></div>
+<input type="file" id="importfile" accept="application/json,.json" hidden>
 <button id="fab-gasto" class="fab-gasto" title="Anotar un gasto suelto">+ Gasto</button>
 <!-- 3 tabs = el balance general: Inicio (flujo del ciclo) · Deudas (pasivos) · Reserva (activos).
      Invertir vive DENTRO de Reserva (piso 3 de la escalera); Resumen se fundió en Deudas. -->
@@ -839,16 +843,47 @@ function applyTheme(){
   const btn=document.getElementById('themebtn'); if(btn)btn.textContent=dark?'☀️':'🌙';
   if(theme)document.querySelectorAll('meta[name="theme-color"]').forEach(m=>m.setAttribute('content',dark?'#000000':'#fbfbfd'));
 }
-document.getElementById('themebtn').addEventListener('click',()=>{
-  const sysDark=window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches;
-  theme=(theme?theme==='dark':!!sysDark)?'light':'dark';
-  localStorage.setItem(THEME_KEY,theme);applyTheme();
-});
 applyTheme();
+// ===== ⚙ Ajustes: idioma, tema, plantillas, copia de seguridad y reinicio — todo en un lugar =====
+function renderSettings(){
+  const el=document.getElementById('settings-card'); if(!el)return;
+  const t=loadTemplates();
+  const dark=theme==='dark';
+  el.innerHTML='<div class="ci-h">⚙ '+tx('Ajustes','Settings')+'</div>'+
+    '<div class="set-h">'+tx('Idioma','Language')+'</div>'+
+    '<div class="wel-modes"><button class="wel-mode'+(lang==='es'?' on':'')+'" data-setlang="es">Español</button><button class="wel-mode'+(lang==='en'?' on':'')+'" data-setlang="en">English</button></div>'+
+    '<div class="set-h">'+tx('Tema','Theme')+'</div>'+
+    '<div class="wel-modes"><button class="wel-mode'+(!dark?' on':'')+'" data-settheme="light">☀️ '+tx('Claro','Light')+'</button><button class="wel-mode'+(dark?' on':'')+'" data-settheme="dark">🌙 '+tx('Oscuro','Dark')+'</button></div>'+
+    '<div class="set-h">📋 '+tx('Plantillas','Templates')+'</div>'+
+    (t.length?'<div class="tpl-list">'+t.map(x=>'<span class="tpl-item"><button class="tpl-load" data-loadtpl="'+esc(x.name)+'">'+esc(x.name)+'</button><button class="tpl-del" data-deltpl="'+esc(x.name)+'" aria-label="'+tx('Borrar','Delete')+'">&times;</button></span>').join('')+'</div>'
+      :'<div class="tpl-empty">'+tx('Arma una quincena y guárdala como plantilla para reusar su estructura.','Set up a cycle and save it as a template to reuse its structure.')+'</div>')+
+    '<button class="bk-btn" data-savetpl="1">💾 '+tx('Guardar esta quincena como plantilla','Save this cycle as a template')+'</button>'+
+    '<div class="set-h">'+tx('Copia de seguridad','Backup')+'</div>'+
+    '<div class="backup" style="margin:0 0 .4rem"><button class="bk-btn" data-export="1">⬇ '+tx('Exportar copia','Export backup')+'</button><button class="bk-btn" data-import="1">⬆ '+tx('Importar copia','Import backup')+'</button></div>'+
+    '<div class="set-h">'+tx('Zona de riesgo','Danger zone')+'</div>'+
+    '<button class="reset" style="margin:.2rem 0 0" data-reset="1">'+tx('Reiniciar esta quincena','Reset this cycle')+'</button>'+
+    '<div class="ci-btns"><button class="ci-go" data-setclose="1">'+tx('Listo','Done')+'</button></div>';
+}
+document.getElementById('settingsbtn').addEventListener('click',()=>{renderSettings();document.getElementById('settings-ovl').hidden=false;});
+(function(){const ov=document.getElementById('settings-ovl');if(!ov)return;
+  ov.addEventListener('click',e=>{
+    const b=e.target.closest('button');
+    if(e.target===ov||(b&&b.dataset.setclose)){ov.hidden=true;return;}
+    if(!b)return;
+    if(b.dataset.setlang){setLang(b.dataset.setlang);applyLang();renderSettings();}
+    else if(b.dataset.settheme){theme=b.dataset.settheme;localStorage.setItem(THEME_KEY,theme);applyTheme();renderSettings();}
+    else if(b.dataset.savetpl){saveAsTemplate();renderSettings();}
+    else if(b.dataset.loadtpl!==undefined){const n=b.dataset.loadtpl;const tiene=(d.nec&&d.nec.some(r=>(parseFloat(r.a)||0)>0||(r.sub&&r.sub.length)))||(d.inc&&sum(d.inc)>0);
+      if(!tiene||confirm(tx('¿Cargar la plantilla "'+n+'"? Reemplaza las categorías de esta quincena.','Load template "'+n+'"? It replaces this cycle\'s categories.'))){applyTemplate(n);ov.hidden=true;}}
+    else if(b.dataset.deltpl!==undefined){const n=b.dataset.deltpl;if(confirm(tx('¿Borrar la plantilla "'+n+'"?','Delete template "'+n+'"?'))){saveTpls(loadTemplates().filter(x=>x.name!==n));renderSettings();}}
+    else if(b.dataset.export){exportData();renderSettings();}
+    else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
+    else if(b.dataset.reset){if(confirm(tx('¿Reiniciar esta quincena? Se borran los montos actuales.','Reset this cycle? Current amounts will be wiped.'))){snapshot();d=def();save();render();ov.hidden=true;}}
+  });})();
+document.getElementById('importfile').addEventListener('change',e=>{if(e.target.files&&e.target.files[0])importData(e.target.files[0]);});
 // Idioma: re-pinta lo estático (tabs, FAB, botones de cabecera) y re-renderiza todo lo dinámico.
 function applyLang(){
   const q=(sel,t)=>{const e=document.querySelector(sel);if(e)e.textContent=t;};
-  q('#langbtn',lang.toUpperCase());
   q('[data-view="inicio"] span:last-child',tx('Inicio','Home'));
   q('[data-view="deudas"] span:last-child',tx('Deudas','Debts'));
   q('[data-view="fondo"] span:last-child',tx('Reserva','Reserve'));
@@ -860,7 +895,6 @@ function applyLang(){
   if(typeof render==='function'&&typeof d!=='undefined')render();
   if(typeof renderDebts==='function')renderDebts();
 }
-document.getElementById('langbtn').addEventListener('click',()=>{setLang(lang==='en'?'es':'en');applyLang();});
 // ===== Ciclos (quincenal o mensual). Cada ciclo tiene su propio presupuesto. =====
 function keyFor(id){return 'midas_pp_'+id;}
 function loadCycles(){try{const x=JSON.parse(localStorage.getItem('midas_cycles'));if(Array.isArray(x)&&x.length)return x;}catch(e){}
@@ -977,6 +1011,8 @@ function cycEditH(c){
       '<label class="ce-l">'+tx('Desde','From')+'<input type="date" data-cycdate="start" value="'+(c.start||'')+'"></label>'+
       '<label class="ce-l">'+tx('Hasta','To')+'<input type="date" data-cycdate="end" value="'+(c.end||'')+'"></label>'+
     '</div>'+
+    // "Me pagan el" es dato DEL CICLO (alimenta el plan de deudas: decide qué vence en esta quincena)
+    (c.id===activeQ?'<div class="ce-dates"><label class="ce-l">'+tx('Me pagan el','I get paid on')+'<input type="date" data-cycpayday="1" value="'+(d.payday||'')+'"></label></div>':'')+
     // Cerrar el ciclo vive acá (operación DEL ciclo). El caso normal ya lo trae el banner automático al vencer.
     (c.id===activeQ?'<button class="ce-cerrar" data-cerrar="1">'+(d.closed?tx('✅ Ciclo cerrado — reabrir/revisar','✅ Cycle closed — reopen/review'):tx('Cerrar este ciclo y pasar al siguiente →','Close this cycle and move to the next →'))+'</button>':'')+
     '<button class="ce-done" data-cyceditdone="1">'+tx('Listo','Done')+'</button>'+
@@ -1057,9 +1093,7 @@ function applyView(){
   else { budgetSecs.forEach(id=>setD(id,false)); setD('focusnav',false); }
   setD('heart', inicio);
   const tog=document.getElementById('focus-toggle');if(tog)tog.style.display=inicio?'':'none';
-  const reset=document.querySelector('.reset');if(reset)reset.style.display=inicio?'':'none';
-  const tpl=document.querySelector('.tpl');if(tpl)tpl.style.display=inicio?'':'none';       // plantillas y backup
-  const bk=document.querySelector('.backup');if(bk)bk.style.display=inicio?'':'none';       // son cosas de Inicio
+  // (reset/plantillas/backup viven en ⚙ Ajustes — ya no hay nada que ocultar por tab aquí)
   // El informe es la LECTURA del ciclo (lo ejecutado real) → tab propio: al fondo de Inicio nadie
   // lo veía. Deudas queda puro (gestión); Reserva = activos con Inversiones como piso 3 adentro.
   setD('sec-informe', view==='informe');
@@ -1206,18 +1240,7 @@ function applyTemplate(name){
   d.itemPaid={};
   save();render();renderDebts();
 }
-let tplOpen=false; // plantillas colapsadas por defecto: es tarea de admin, no de uso diario — no ensucia Inicio
-function templatesH(){
-  const t=loadTemplates();
-  let h='<div class="tpl"><button class="tpl-h tpl-toggle" data-tpltoggle="1">📋 '+tx('Plantillas','Templates')+' '+(tplOpen?'▾':'▸')+'</button>';
-  if(tplOpen){
-    if(t.length) h+='<div class="tpl-list">'+t.map(x=>'<span class="tpl-item"><button class="tpl-load" data-loadtpl="'+esc(x.name)+'">'+esc(x.name)+'</button><button class="tpl-del" data-deltpl="'+esc(x.name)+'" aria-label="'+tx('Borrar','Delete')+'">&times;</button></span>').join('')+'</div>';
-    else h+='<div class="tpl-empty">'+tx('Arma una quincena y guárdala como plantilla para reusar su estructura en las siguientes.','Build one cycle and save it as a template to reuse its structure in the next ones.')+'</div>';
-    h+='<button class="bk-btn" data-savetpl="1">💾 '+tx('Guardar esta quincena como plantilla','Save this cycle as a template')+'</button>';
-  }
-  h+='</div>';
-  return h;
-}
+// (templatesH murió: las plantillas viven ahora en ⚙ Ajustes — renderSettings las pinta.)
 
 let history=[];
 // Fondo / Reserva: ahorros pre-existentes. El resultado de cada quincena (sobró/faltó) suma o resta aquí.
@@ -1996,19 +2019,18 @@ function render(){
     '<div class="sec" id="sec-inc" style="margin-top:.5rem">'+
       '<div class="hero-inc">'+
         '<div class="hi-lbl">'+tx('presupuesto del ciclo','cycle budget')+'</div>'+
-        '<div class="hi-num" id="hi-num">—</div>'+
+        // El número grande ES el botón: tocarlo despliega el desglose de fuentes ahí mismo (sin pantallita aparte)
+        '<div class="hi-num" id="hi-num" data-incedit="1" role="button" title="'+tx('Toca para ver y editar tus fuentes','Tap to view and edit your sources')+'"><span id="hi-num-v">—</span><span class="hi-chev">'+(incEdit?'▲':'▾')+'</span></div>'+
         '<div class="hi-sub"><b id="hi-cycle"></b></div>'+
         // La REALIDAD, siempre visible: tu plata real ahora (editable) + lo que viene en camino.
         '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">💰 '+tx('Tengo ahora','On hand')+' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"><span class="hi-camino" id="hi-camino"></span></div>'+
         '<div id="banco-cta" class="hi-chip"></div>'+
-        '<button class="hi-edit" data-incedit="1">'+(incEdit?tx('▲ cerrar','▲ close'):tx('✎ editar ingresos','✎ edit income'))+'</button>'+
       '</div>'+
+      // Desglose de FUENTES: se abre tocando el número grande. ("Me pagan el" vive en el ✎ del ciclo.)
       '<div id="inc-detail"'+(incEdit?'':' style="display:none"')+'>'+
-        '<div class="sec-note" style="margin-top:.6rem">'+tx('Agrega el pago que cubrirá este plazo.','Add the payment that covers this period.')+'</div>'+
-        '<div class="sec-note" style="margin-top:-.45rem">'+tx('Me pagan el:','I get paid on:')+' <input id="payday" data-payday="1" type="date" min="2024-01-01" max="2100-12-31" value="'+(d.payday||'')+'" style="font:inherit;font-size:13px;color:var(--accent);background:transparent;border:none;border-bottom:1.5px dashed var(--line);padding:1px 2px"></div>'+
         incRows+
-        '<button class="add" data-add="inc"><span class="p">+</span> '+tx('Agregar ingreso','Add income')+'</button>'+
-        '<div class="tot"><span class="lbl">'+tx('Ingreso total proyectado','Projected total income')+'</span><span class="val" id="tot-inc"></span></div>'+
+        '<button class="add" data-add="inc"><span class="p">+</span> '+tx('Agregar fuente','Add a source')+'</button>'+
+        '<div class="tot"><span class="lbl">'+tx('Total de tus fuentes','Total from your sources')+'</span><span class="val" id="tot-inc"></span></div>'+
       '</div>'+
     '</div>'+
     '<div class="heart macro-card" id="heart">'+
@@ -2030,11 +2052,8 @@ function render(){
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
     // (Sección Balance eliminada: "en mano" vive en el hero, el asesor es un chip contextual ahí mismo,
     //  y "Cerrar ciclo" se mudó al editor del ciclo — el lápiz ✎ de la barra.)
-    '<div class="sec" id="sec-informe"><div class="sec-h"><span class="t">📊 '+tx('Informe del ciclo','Cycle report')+'</span></div><div id="informe-body"></div></div>'+
-    '<button class="reset" data-reset="1">'+tx('Reiniciar esta quincena','Reset this cycle')+'</button>'+
-    templatesH()+
-    '<div class="backup"><button class="bk-btn" data-export="1">⬇ '+tx('Exportar copia','Export backup')+'</button><button class="bk-btn" data-import="1">⬆ '+tx('Importar copia','Import backup')+'</button><input type="file" id="importfile" accept="application/json,.json" hidden></div>';
-  // (Modo enfocado eliminado: era el wizard viejo de escenas — nadie lo usaba y ensuciaba el pie.)
+    '<div class="sec" id="sec-informe"><div class="sec-h"><span class="t">📊 '+tx('Informe del ciclo','Cycle report')+'</span></div><div id="informe-body"></div></div>';
+  // (Reiniciar / plantillas / backup se mudaron a ⚙ Ajustes — el pie del Inicio queda limpio.)
   recompute();
 }
 
@@ -2093,7 +2112,7 @@ function recompute(){
   const ge=(id)=>document.getElementById(id);
   const tot=ge('tot-inc');if(tot)tot.textContent=pe(ti);
   const binc=ge('b-inc');if(binc)binc.textContent=pe(ti);
-  const hn=ge('hi-num');if(hn)hn.textContent=pe(ti);
+  const hn=ge('hi-num-v');if(hn)hn.textContent=pe(ti);
   const hc=ge('hi-cycle');if(hc){const cyc=cycleOf(activeQ);
     const dates=cyc.start?' ('+fmtFecha(cyc.start)+' – '+fmtFecha(cyc.end)+')':'';
     hc.textContent=cycleLabel(cyc)+dates;}
@@ -2191,7 +2210,8 @@ function recompute(){
   {const bti=document.getElementById('banco-total-inp'); if(bti&&document.activeElement!==bti)bti.value=(bancoTotal===''?'':Math.round(saldoVivo()));}
   {const cam=document.getElementById('hi-camino'), bc=document.getElementById('banco-cta'); const bx=bancoExtra();
    const fut=isFutureActive();
-    if(cam)cam.innerHTML=(bx&&bx.porLlegar>0.5)?' · '+tx('en camino','incoming')+' S/ '+pn(bx.porLlegar):'';
+    if(cam)cam.innerHTML=((bx&&bx.porLlegar>0.5)?' · '+tx('en camino','incoming')+' S/ '+pn(bx.porLlegar):'')+
+      ((typeof fondo==='number'&&fondo>0.5)?' · 🔒 '+tx('Reserva','Reserve')+' '+pn(fondo):''); // el desglose de tu realidad en una línea
     if(bc){
       // El presente es exclusivo: solo el ciclo EN CURSO reclama tu plata. En un futuro estás planificando.
       if(fut){bc.innerHTML='<div class="hi-chip-plan">🔮 '+tx('Estás planificando un ciclo futuro — tu plata real se concilia en el ciclo en curso.','You\'re planning a future cycle — your actual money reconciles in the current one.')+'</div>';}
@@ -2247,6 +2267,7 @@ document.getElementById('cyclebar').addEventListener('click',e=>{const b=e.targe
 });
 // Editar fechas del ciclo en vivo (no re-render completo para no perder foco del input de fecha).
 document.getElementById('cyclebar').addEventListener('input',e=>{const t=e.target;
+  if(t.dataset&&t.dataset.cycpayday!==undefined){d.payday=t.value;save();recompute();return;} // "me pagan el" del ciclo activo
   if(!t.dataset||!t.dataset.cycdate)return;
   const c=cycleOf(activeQ);c[t.dataset.cycdate]=t.value;saveCycles();
   const cur=document.querySelector('.cyc-cur');if(cur)cur.textContent=cycleLabel(c);
@@ -2286,6 +2307,8 @@ app.addEventListener('input',e=>{const t=e.target;
   }
 });
 app.addEventListener('click',e=>{
+  const hn=e.target.closest('#hi-num'); // el número grande es un div-botón: tocarlo abre/cierra el desglose de fuentes
+  if(hn){incEdit=!incEdit;render();return;}
   const hdr=e.target.closest('.sec-h[data-collapse]'); // header acordeón: todo el encabezado pliega
   if(hdr){collapsed[hdr.dataset.collapse]=!collapsed[hdr.dataset.collapse];render();return;}
   const tr=e.target.closest('[data-toggleroll]'); // chip "↻ 50/30/20": muestra/oculta el reparto en las cajas
@@ -2372,7 +2395,6 @@ app.addEventListener('click',e=>{
   else if(b.dataset.export){exportData();}
   else if(b.dataset.backuplater){const d3=new Date(Date.now()+3*864e5);localStorage.setItem('midas_backup_snooze',isoOf(d3));render();} // "luego" = 3 días de silencio
   else if(b.dataset.savetpl){saveAsTemplate();}
-  else if(b.dataset.tpltoggle!==undefined){tplOpen=!tplOpen;render();}
   else if(b.dataset.loadtpl!==undefined){const n=b.dataset.loadtpl;const tiene=(d.nec&&d.nec.some(r=>(parseFloat(r.a)||0)>0||(r.sub&&r.sub.length)))||(d.inc&&sum(d.inc)>0);if(!tiene||confirm(tx('¿Cargar la plantilla "'+n+'"? Reemplaza las categorías de esta quincena.','Load template "'+n+'"? It replaces this cycle\'s categories.')))applyTemplate(n);}
   else if(b.dataset.deltpl!==undefined){const n=b.dataset.deltpl;if(confirm(tx('¿Borrar la plantilla "'+n+'"?','Delete template "'+n+'"?'))){saveTpls(loadTemplates().filter(x=>x.name!==n));render();}}
   else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
