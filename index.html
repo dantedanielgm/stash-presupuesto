@@ -208,8 +208,8 @@ body.focuson .reset{display:none}
 .hi-num{font-size:42px; font-weight:800; letter-spacing:-.03em; line-height:1; color:var(--tx); font-variant-numeric:tabular-nums; cursor:pointer; -webkit-tap-highlight-color:transparent}
 .hi-num:active{opacity:.75}
 .hi-chev{font-size:15px; font-weight:400; color:var(--tx3); margin-left:.4rem; vertical-align:middle}
-.hi-manochip{font:inherit; font-size:11px; font-weight:800; color:var(--accent); background:transparent; border:1.5px solid var(--accent); border-radius:999px; padding:.14rem .5rem; margin-left:.4rem; cursor:pointer; vertical-align:middle; white-space:nowrap}
-.hi-manochip:active{transform:scale(.95)}
+.hi-manolbl{font:inherit; font-size:inherit; font-weight:inherit; color:inherit; background:transparent; border:none; padding:0; cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px}
+.hi-manolbl:hover{color:var(--accent)}
 .hi-tag{font:inherit; font-size:inherit; font-weight:inherit; color:inherit; background:transparent; border:none; padding:0; cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px}
 .hi-tag:hover{color:var(--accent)}
 /* La realidad en el hero: en mano (editable) + en camino + chip contextual */
@@ -850,6 +850,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
+const APP_BUILD='2026-07-11.1'; // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -884,6 +885,7 @@ function renderSettings(){
     '<div class="backup" style="margin:0 0 .4rem"><button class="bk-btn" data-export="1">⬇ '+tx('Exportar copia','Export backup')+'</button><button class="bk-btn" data-import="1">⬆ '+tx('Importar copia','Import backup')+'</button></div>'+
     '<div class="set-h">'+tx('Zona de riesgo','Danger zone')+'</div>'+
     '<button class="reset" style="margin:.2rem 0 0" data-reset="1">'+tx('Reiniciar esta quincena','Reset this cycle')+'</button>'+
+    '<div class="ci-note" style="text-align:center;margin-top:.8rem">Stash · build '+APP_BUILD+'</div>'+
     '<div class="ci-btns"><button class="ci-go" data-setclose="1">'+tx('Listo','Done')+'</button></div>';
 }
 document.getElementById('settingsbtn').addEventListener('click',()=>{renderSettings();document.getElementById('settings-ovl').hidden=false;});
@@ -2097,9 +2099,13 @@ function render(){
         // La REALIDAD: tu plata real (editable) + en camino + Reserva. SOLO en el ciclo presente —
         // en un futuro estás planificando y tu plata no puede ser reclamada por dos planes.
         (isFutureActive()?'':
-        '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">💰 '+tx('Tengo ahora','On hand')+' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"'+
-          ((hasCuentas()&&metible>0.5&&!d.closed)?'><button class="hi-manochip" data-metermano="1" title="'+tx('Destinar parte de esta plata como fuente de ESTE ciclo','Send part of this money in as a source of THIS cycle')+'">→ '+tx('al ciclo','to cycle')+'</button':'')+
-          '><span class="hi-camino" id="hi-camino"></span></div>')+
+        '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">'+
+          // "Tengo ahora" ES el botón (pedido de DD): tocarlo destina plata a este ciclo. Si ya no hay
+          // plata sin destino, es texto plano — sin chips extra.
+          ((hasCuentas()&&metible>0.5&&!d.closed)
+            ?'<button class="hi-manolbl" data-metermano="1" title="'+tx('Toca para destinar esta plata a ESTE ciclo','Tap to send this money into THIS cycle')+'">💰 '+tx('Tengo ahora','On hand')+'</button>'
+            :'💰 '+tx('Tengo ahora','On hand'))+
+          ' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"><span class="hi-camino" id="hi-camino"></span></div>')+
         '<div id="banco-cta" class="hi-chip"></div>'+
       '</div>'+
       // Desglose de FUENTES: se abre tocando el número grande. ("Me pagan el" vive en el ✎ del ciclo.)
