@@ -208,6 +208,10 @@ body.focuson .reset{display:none}
 .hi-num{font-size:42px; font-weight:800; letter-spacing:-.03em; line-height:1; color:var(--tx); font-variant-numeric:tabular-nums; cursor:pointer; -webkit-tap-highlight-color:transparent}
 .hi-num:active{opacity:.75}
 .hi-chev{font-size:15px; font-weight:400; color:var(--tx3); margin-left:.4rem; vertical-align:middle}
+.hi-manochip{font:inherit; font-size:11px; font-weight:800; color:var(--accent); background:transparent; border:1.5px solid var(--accent); border-radius:999px; padding:.14rem .5rem; margin-left:.4rem; cursor:pointer; vertical-align:middle; white-space:nowrap}
+.hi-manochip:active{transform:scale(.95)}
+.hi-tag{font:inherit; font-size:inherit; font-weight:inherit; color:inherit; background:transparent; border:none; padding:0; cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px}
+.hi-tag:hover{color:var(--accent)}
 /* La realidad en el hero: en mano (editable) + en camino + chip contextual */
 .hi-mano{margin-top:.7rem; font-size:14px; font-weight:600; color:var(--tx2); display:inline-flex; align-items:center; gap:.15rem; flex-wrap:wrap; justify-content:center}
 .hi-mano input{width:88px; font:inherit; font-size:18px; font-weight:800; color:var(--tx); text-align:right; background:transparent; border:none; border-bottom:1.5px dashed var(--line); padding:0 2px}
@@ -1223,6 +1227,15 @@ function createCycleForToday(type){
 (function resolveByDate(){
   const hoy=isoToday(), cur=cycleOf(activeQ);
   const isClosed=id=>{try{const x=JSON.parse(localStorage.getItem(keyFor(id)));return !!(x&&x.closed);}catch(e){return false;}};
+  // AUTO-CURA del limbo post-cierre: si HOY cae dentro de un ciclo CERRADO y estás en el ciclo
+  // INMEDIATO siguiente (que aún "no empieza"), ese siguiente ES tu presente → arranca hoy.
+  // (Mismo principio que el toggle "el siguiente arranca HOY" del cierre — aplicado a data anterior
+  // a ese feature o a cierres donde quedó apagado. Parquearse LEJOS en el futuro se sigue respetando.)
+  const hoyCyc=cycles.find(x=>x.start&&x.end&&x.start<=hoy&&hoy<=x.end&&x.id!==activeQ);
+  if(hoyCyc&&isClosed(hoyCyc.id)&&cur.start&&cur.start>hoy&&!isClosed(activeQ)){
+    const k=cycles.findIndex(c=>c.id===hoyCyc.id);
+    if(k>=0&&cycles[k+1]&&cycles[k+1].id===activeQ){cur.start=hoy;saveCycles();}
+  }
   // La fecha es un empujón hacia ADELANTE, nunca una correa hacia atrás: si te paraste en un ciclo
   // FUTURO a propósito (a planificar) y no lo cerraste, te respeta ahí — no te jala al presente.
   if(cur.start&&cur.start>hoy&&!isClosed(activeQ))return;
@@ -1231,6 +1244,7 @@ function createCycleForToday(type){
   // Si el ciclo de hoy ya se CERRÓ, tu presente es el siguiente sin cerrar (cerrar = pasar la página;
   // la fecha no puede devolverte a una página que ya pasaste).
   while(id&&isClosed(id)){const k=cycles.findIndex(c=>c.id===id);id=(k>=0&&k<cycles.length-1)?cycles[k+1].id:null;}
+  if(id){const c2=cycleOf(id); if(c2&&c2.start&&c2.start>hoy){c2.start=hoy;saveCycles();}} // el heredero del cierre también arranca hoy
   if(!id){ const dated=cycles.filter(x=>x.end);
     const last=dated.length?dated.reduce((a,b)=>a.end>b.end?a:b):null;
     if(last&&last.end<hoy) id=createCycleForToday(last.type==='m'?'m':'q'); }
@@ -2075,8 +2089,12 @@ function render(){
         // El número grande ES el botón: tocarlo despliega el desglose de fuentes ahí mismo (sin pantallita aparte)
         '<div class="hi-num" id="hi-num" data-incedit="1" role="button" title="'+tx('Toca para ver y editar tus fuentes','Tap to view and edit your sources')+'"><span id="hi-num-v">—</span><span class="hi-chev">'+(incEdit?'▲':'▾')+'</span></div>'+
         '<div class="hi-sub"><b id="hi-cycle"></b></div>'+
-        // La REALIDAD, siempre visible: tu plata real ahora (editable) + lo que viene en camino.
-        '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">💰 '+tx('Tengo ahora','On hand')+' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"><span class="hi-camino" id="hi-camino"></span></div>'+
+        // La REALIDAD: tu plata real (editable) + en camino + Reserva. SOLO en el ciclo presente —
+        // en un futuro estás planificando y tu plata no puede ser reclamada por dos planes.
+        (isFutureActive()?'':
+        '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">💰 '+tx('Tengo ahora','On hand')+' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"'+
+          ((hasCuentas()&&saldoVivo()>0.5&&!d.closed)?'><button class="hi-manochip" data-metermano="1" title="'+tx('Destinar parte de esta plata como fuente de ESTE ciclo','Send part of this money in as a source of THIS cycle')+'">→ '+tx('al ciclo','to cycle')+'</button':'')+
+          '><span class="hi-camino" id="hi-camino"></span></div>')+
         '<div id="banco-cta" class="hi-chip"></div>'+
       '</div>'+
       // Desglose de FUENTES: se abre tocando el número grande. ("Me pagan el" vive en el ✎ del ciclo.)
@@ -2267,8 +2285,10 @@ function recompute(){
   {const bti=document.getElementById('banco-total-inp'); if(bti&&document.activeElement!==bti)bti.value=(bancoTotal===''?'':Math.round(saldoVivo()));}
   {const cam=document.getElementById('hi-camino'), bc=document.getElementById('banco-cta'); const bx=bancoExtra();
    const fut=isFutureActive();
-    if(cam)cam.innerHTML=((bx&&bx.porLlegar>0.5)?' · '+tx('en camino','incoming')+' S/ '+pn(bx.porLlegar):'')+
-      ((typeof fondo==='number'&&fondo>0.5)?' · 🔒 '+tx('Reserva','Reserve')+' '+pn(fondo):''); // el desglose de tu realidad en una línea
+    // El desglose de tu realidad en una línea — cada pieza es TOCABLE y explica de dónde nace:
+    // "en camino" = tus fuentes aún sin ✓ (toca → abre el desglose); "Reserva" = tu apartado (toca → su tab).
+    if(cam)cam.innerHTML=((bx&&bx.porLlegar>0.5)?' · <button class="hi-tag" data-openfuentes="1" title="'+tx('Fuentes que aún no marcas como recibidas. Toca para verlas — su ✓ es «ya me llegó».','Sources you haven\'t checked as received yet. Tap to view — their ✓ means "it arrived".')+'">📥 '+tx('en camino','incoming')+' S/ '+pn(bx.porLlegar)+'</button>':'')+
+      ((typeof fondo==='number'&&fondo>0.5)?' · <button class="hi-tag" data-goview="fondo" title="'+tx('Tu plata apartada. Toca para ir a la Reserva.','Your money set aside. Tap to open the Reserve.')+'">🔒 '+tx('Reserva','Reserve')+' '+pn(fondo)+'</button>':'');
     if(bc){
       // El presente es exclusivo: solo el ciclo EN CURSO reclama tu plata. En un futuro estás planificando.
       if(fut){bc.innerHTML='<div class="hi-chip-plan">🔮 '+tx('Estás planificando un ciclo futuro — tu plata real se concilia en el ciclo en curso.','You\'re planning a future cycle — your actual money reconciles in the current one.')+'</div>';}
@@ -2446,6 +2466,7 @@ app.addEventListener('click',e=>{
   else if(b.dataset.focustoggle){focusMode=!focusMode;focusStep=0;applyFocus();window.scrollTo({top:0,behavior:'smooth'});}
   else if(b.dataset.paid!==undefined){toggleDebtPaid(b.dataset.paid);}
   else if(b.dataset.goview){view=b.dataset.goview;applyView();window.scrollTo({top:0,behavior:'smooth'});}
+  else if(b.dataset.openfuentes){incEdit=true;render();} // "en camino" tocado → abre el desglose de fuentes
   else if(b.dataset.incedit){incEdit=!incEdit;render();}
   else if(b.dataset.collapse!==undefined){collapsed[b.dataset.collapse]=!collapsed[b.dataset.collapse];render();}
   else if(b.dataset.collapseall){const anyOpen=Object.values(collapsed).some(v=>!v);['aho','nec','luj'].forEach(g=>collapsed[g]=anyOpen);render();}
