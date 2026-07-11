@@ -2083,6 +2083,10 @@ function render(){
       '<div id="inc-detail"'+(incEdit?'':' style="display:none"')+'>'+
         incRows+
         '<button class="add" data-add="inc"><span class="p">+</span> '+tx('Agregar fuente','Add a source')+'</button>'+
+        // Destinar plata en mano a ESTE ciclo, a voluntad (sin esperar al chip): entra como fuente
+        // "De tu plata" ya recibida — el número grande sube, el contador no se duplica.
+        (hasCuentas()&&saldoVivo()>0.5&&!d.closed&&!isFutureActive()
+          ?'<button class="add" data-metermano="1"><span class="p">💰</span> '+tx('Meter mi plata en mano a este ciclo','Put my money on hand into this cycle')+'</button>':'')+
         '<div class="tot"><span class="lbl">'+tx('Total de tus fuentes','Total from your sources')+'</span><span class="val" id="tot-inc"></span></div>'+
       '</div>'+
     '</div>'+
@@ -2455,6 +2459,13 @@ app.addEventListener('click',e=>{
   else if(b.dataset.wfopen){openWindfall();}
   else if(b.dataset.metadate){openMetaModal();} // 🎂 desde la caja Ahorro — mismo modal que en Reserva
   else if(b.dataset.cubredef){snapshot();injectPlata(+b.dataset.cubredef);save();render();renderDebts();} // plata en mano → ingreso del plan (nace recibida)
+  else if(b.dataset.metermano){ // destinar plata en mano al ciclo, con monto elegible (tope = lo que tienes)
+    const max=Math.round(Math.max(saldoVivo(),0));
+    const v=prompt(tx('¿Cuánto de tu plata en mano destinas a ESTE ciclo? Tienes S/ ','How much of your money on hand goes to THIS cycle? You have S/ ')+max,max);
+    if(v===null)return;
+    const n=Math.min(Math.max(parseFloat(v)||0,0),max);
+    if(n<=0)return;
+    snapshot();injectPlata(n);save();render();renderDebts();}
   else if(b.dataset.asignar){const pp=b.dataset.asignar.split('-');asignaEnCategoria(pp[0],+pp[1]);}
   else if(b.dataset.asignalisto){asignaListo();}
   else if(b.dataset.asignacancel){asignaCancelar();}
