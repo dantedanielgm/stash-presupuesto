@@ -2070,6 +2070,11 @@ function render(){
   // sincronizar botones de tab
   renderCycleBar();
   let incRows=d.inc.map((r,i)=>rowH('inc',i,r)).join('');
+  // "Metible" = tu plata SIN TRABAJO (la que el plan aún no explica) — NO todo tu saldo: si ya la
+  // metiste como fuente, meterla otra vez sería contarla doble. Con metible=0 los botones se BLOQUEAN.
+  const bxH=(typeof bancoExtra==='function')?bancoExtra():null;
+  const metible=bxH?Math.max(bxH.extra,0):0;
+  const yaMetido=(d.inc||[]).some(r=>r.fromPlata&&(parseFloat(r.a)||0)>0);
   // Banners de frontera de ciclo: (a) este/otro ciclo venció y sigue sin cerrar → invita a cerrarlo
   // (prompted commit: la app detecta la frontera, el humano aprieta el botón); (b) ciclo ya cerrado
   // → muestra su asiento (closeLog) como línea de solo-lectura.
@@ -2093,7 +2098,7 @@ function render(){
         // en un futuro estás planificando y tu plata no puede ser reclamada por dos planes.
         (isFutureActive()?'':
         '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">💰 '+tx('Tengo ahora','On hand')+' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"'+
-          ((hasCuentas()&&saldoVivo()>0.5&&!d.closed)?'><button class="hi-manochip" data-metermano="1" title="'+tx('Destinar parte de esta plata como fuente de ESTE ciclo','Send part of this money in as a source of THIS cycle')+'">→ '+tx('al ciclo','to cycle')+'</button':'')+
+          ((hasCuentas()&&metible>0.5&&!d.closed)?'><button class="hi-manochip" data-metermano="1" title="'+tx('Destinar parte de esta plata como fuente de ESTE ciclo','Send part of this money in as a source of THIS cycle')+'">→ '+tx('al ciclo','to cycle')+'</button':'')+
           '><span class="hi-camino" id="hi-camino"></span></div>')+
         '<div id="banco-cta" class="hi-chip"></div>'+
       '</div>'+
@@ -2101,10 +2106,13 @@ function render(){
       '<div id="inc-detail"'+(incEdit?'':' style="display:none"')+'>'+
         incRows+
         '<button class="add" data-add="inc"><span class="p">+</span> '+tx('Agregar fuente','Add a source')+'</button>'+
-        // Destinar plata en mano a ESTE ciclo, a voluntad (sin esperar al chip): entra como fuente
-        // "De tu plata" ya recibida — el número grande sube, el contador no se duplica.
-        (hasCuentas()&&saldoVivo()>0.5&&!d.closed&&!isFutureActive()
-          ?'<button class="add" data-metermano="1"><span class="p">💰</span> '+tx('Meter mi plata en mano a este ciclo','Put my money on hand into this cycle')+'</button>':'')+
+        // Destinar plata en mano a ESTE ciclo, a voluntad. Tope = plata SIN TRABAJO (metible):
+        // si ya está toda dentro, el botón se convierte en etiqueta de estado — no se puede duplicar.
+        (!d.closed&&!isFutureActive()&&hasCuentas()
+          ?(metible>0.5
+            ?'<button class="add" data-metermano="1"><span class="p">💰</span> '+tx('Meter mi plata en mano a este ciclo','Put my money on hand into this cycle')+'</button>'
+            :(yaMetido?'<div class="sec-note" style="margin:.35rem 0 0">✓ '+tx('Tu plata en mano ya está dentro de este ciclo (fuente "De tu plata").','Your money on hand is already inside this cycle (source "From your money").')+'</div>':''))
+          :'')+
         '<div class="tot"><span class="lbl">'+tx('Total de tus fuentes','Total from your sources')+'</span><span class="val" id="tot-inc"></span></div>'+
       '</div>'+
     '</div>'+
@@ -2294,13 +2302,13 @@ function recompute(){
       if(fut){bc.innerHTML='<div class="hi-chip-plan">🔮 '+tx('Estás planificando un ciclo futuro — tu plata real se concilia en el ciclo en curso.','You\'re planning a future cycle — your actual money reconciles in the current one.')+'</div>';}
       else if(d.closed){bc.innerHTML='';}
       else if(!bx){bc.innerHTML='';}
+      // Plan en déficit Y hay plata SIN TRABAJO que puede cubrirlo (total o en parte): el 🩹 gana
+      // prioridad sobre el ✨. OJO: el tope es la plata sin trabajo, NUNCA todo el saldo — la plata
+      // ya metida al plan no se puede volver a meter (doble conteo).
+      else if(typeof wfDeficit==='function'&&wfDeficit()>0.5&&bx.extra>0.5){
+        const need=wfDeficit(), usa=Math.round(Math.min(need,bx.extra));
+        bc.innerHTML='<button class="hi-chip-btn ok" data-cubredef="'+usa+'">🩹 '+tx('Tu plan tiene un déficit de','Your plan is short')+' S/ '+pn(need)+' — '+tx('cúbrelo con tu plata sin destino','cover it with your unassigned money')+' (S/ '+pn(usa)+') →</button>';}
       else if(bx.extra>0.5){bc.innerHTML='<button class="hi-chip-btn ok" data-wfopen="1">✨ S/ '+pn(bx.extra)+' '+tx('sin trabajo — dale un destino →','with no job — give it one →')+'</button>';}
-      // Plan en déficit PERO tienes plata en mano que lo cubre (total o en parte): antes la app se
-      // quedaba MUDA aquí (la plata estaba "explicada" cubriendo el hueco, extra≈0, ningún chip) —
-      // justo cuando más falta la acción. Este botón formaliza tu plata como ingreso del plan.
-      else if(typeof wfDeficit==='function'&&wfDeficit()>0.5&&saldoVivo()>0.5){
-        const need=wfDeficit(), usa=Math.round(Math.min(need,Math.max(saldoVivo(),0)));
-        bc.innerHTML='<button class="hi-chip-btn ok" data-cubredef="'+usa+'">🩹 '+tx('Tu plan tiene un déficit de','Your plan is short')+' S/ '+pn(need)+' — '+tx('cúbrelo con tu plata en mano','cover it with your money on hand')+' (S/ '+pn(usa)+') →</button>';}
       else if(bx.extra<-0.5){bc.innerHTML='<div class="hi-chip-warn">⚠ '+tx('Te faltan','You\'re short')+' S/ '+pn(-bx.extra)+' '+tx('para tu plan. ¿Un gasto sin registrar, o un ingreso que aún no marcas?','for your plan. An unlogged expense, or income you haven\'t checked yet?')+'</div>';}
       else {bc.innerHTML='';}
     }}
@@ -2466,7 +2474,8 @@ app.addEventListener('click',e=>{
   else if(b.dataset.focustoggle){focusMode=!focusMode;focusStep=0;applyFocus();window.scrollTo({top:0,behavior:'smooth'});}
   else if(b.dataset.paid!==undefined){toggleDebtPaid(b.dataset.paid);}
   else if(b.dataset.goview){view=b.dataset.goview;applyView();window.scrollTo({top:0,behavior:'smooth'});}
-  else if(b.dataset.openfuentes){incEdit=true;render();} // "en camino" tocado → abre el desglose de fuentes
+  else if(b.dataset.openfuentes){incEdit=true;render(); // "en camino" tocado → abre el desglose Y te lleva a él
+    setTimeout(()=>{const el=document.getElementById('inc-detail');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);}
   else if(b.dataset.incedit){incEdit=!incEdit;render();}
   else if(b.dataset.collapse!==undefined){collapsed[b.dataset.collapse]=!collapsed[b.dataset.collapse];render();}
   else if(b.dataset.collapseall){const anyOpen=Object.values(collapsed).some(v=>!v);['aho','nec','luj'].forEach(g=>collapsed[g]=anyOpen);render();}
@@ -2480,9 +2489,11 @@ app.addEventListener('click',e=>{
   else if(b.dataset.wfopen){openWindfall();}
   else if(b.dataset.metadate){openMetaModal();} // 🎂 desde la caja Ahorro — mismo modal que en Reserva
   else if(b.dataset.cubredef){snapshot();injectPlata(+b.dataset.cubredef);save();render();renderDebts();} // plata en mano → ingreso del plan (nace recibida)
-  else if(b.dataset.metermano){ // destinar plata en mano al ciclo, con monto elegible (tope = lo que tienes)
-    const max=Math.round(Math.max(saldoVivo(),0));
-    const v=prompt(tx('¿Cuánto de tu plata en mano destinas a ESTE ciclo? Tienes S/ ','How much of your money on hand goes to THIS cycle? You have S/ ')+max,max);
+  else if(b.dataset.metermano){ // destinar plata en mano al ciclo — tope = plata SIN TRABAJO (no se puede duplicar)
+    const bx2=(typeof bancoExtra==='function')?bancoExtra():null;
+    const max=Math.round(Math.max(bx2?bx2.extra:0,0));
+    if(max<=0)return;
+    const v=prompt(tx('¿Cuánto de tu plata en mano destinas a ESTE ciclo? Disponible sin destino: S/ ','How much of your money on hand goes to THIS cycle? Unassigned: S/ ')+max,max);
     if(v===null)return;
     const n=Math.min(Math.max(parseFloat(v)||0,0),max);
     if(n<=0)return;
