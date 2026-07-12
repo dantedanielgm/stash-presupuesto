@@ -362,6 +362,10 @@ body.focuson .ov-bar{display:none}
 .pcheck{width:22px; height:22px; flex:none; border:2px solid var(--line); background:transparent; border-radius:6px; cursor:pointer; color:#fff; font-size:13px; font-weight:800; line-height:1; display:flex; align-items:center; justify-content:center; transition:.15s; padding:0}
 .pcheck:hover{border-color:var(--accent)}
 .pcheck.on{background:var(--ok); border-color:var(--ok)}
+/* ½ = "me llegó una parte" (solo fuentes sin ✓): divide la fila — lo llegado pasa a plata en mano */
+.pchk-part{border-style:dashed; color:var(--tx3); font-size:11px}
+.pchk-part:hover{color:var(--accent)}
+.row .pchk-sp{width:22px; flex:none}
 .pl.is-paid{opacity:.5}
 .row.sub.is-paid{opacity:.55}
 .paidbar{display:flex; gap:.8rem; font-size:12.5px; color:var(--tx2); margin:.2rem 0 .8rem; padding:.5rem .7rem; background:var(--line2); border-radius:var(--rad-sm)}
@@ -850,7 +854,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-11.2'; // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-12.1'; // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -2019,6 +2023,10 @@ function rowH(g,i,r){
     (asigna&&g!=='inc'?'<button class="asigna-btn" data-asignar="'+g+'-'+i+'" title="Mandar plata aquí">+ S/</button>':'')+
     (canTj?'<button class="tjt'+(r.tj?' on':'')+'" data-tjt="1" data-grp="'+g+'" data-idx="'+i+'" title="'+(r.tj?'En tarjeta: '+esc(r.tjCard||''):'Pagar con tarjeta')+'">'+TJ_SVG+'</button>':'')+
     '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" aria-label="Eliminar">&times;</button>'+
+    // ½ solo en fuentes EN CAMINO (sin ✓): "me llegó una parte" — divide la fuente sin tocar el total
+    (g==='inc'?(!paid&&(parseFloat(amt)||0)>0.5
+      ?'<button class="pcheck pchk-part" data-incpart="'+i+'" title="'+tx('Me llegó una parte (no todo). Lo llegado pasa a tu plata en mano; el resto sigue en camino.','Part of it arrived (not all). What arrived joins your money on hand; the rest stays incoming.')+'">½</button>'
+      :'<span class="pchk-sp"></span>'):'')+
     '<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'" title="'+(g==='inc'?tx('Ya me llegó esta plata','This money arrived'):(g==='aho'?tx('Ya lo aparté','Set aside'):tx('Ya pagué esto','I paid this')))+'">'+(paid?'✓':'')+'</button>'+'</div>';
   if(canTj && tjOpen===(g+'-'+i)) h+=tjPickerH(g,i,null,r);
   if(g!=='inc'){
@@ -2538,6 +2546,27 @@ app.addEventListener('click',e=>{
   else if(b.dataset.deldebt!==undefined){snapshot();const i=+b.dataset.deldebt;const nm=debts[i]&&debts[i].n;debts.splice(i,1);if(nm&&d.debtPay)delete d.debtPay[nm];saveDebts();save();render();renderDebts();}
   else if(b.dataset.debtmode!==undefined){const nm=b.dataset.debtmode,mo=b.dataset.m;if(mo==='otro'&&!promptOtroMonto(nm))return;if(!d.debtPay)d.debtPay={};d.debtPay[nm]=mo;save();render();}
   else if(b.dataset.debtpaid!==undefined){toggleDebtPaid(b.dataset.debtpaid);}
+  else if(b.dataset.incpart!==undefined){ // ½ en INGRESO = "me llegó una parte": divide la fuente en dos —
+    // lo llegado nace como fila con ✓ (sube tu plata en mano por el MISMO camino que el check completo:
+    // d.incGot + bancoTotal) y el resto queda en camino. El total de fuentes NO cambia: 1400 esperados
+    // siguen siendo 900 ✓ + 500 📥. Si dices que llegó todo, equivale a tocar el ✓.
+    const i=+b.dataset.incpart, row=d.inc[i];
+    if(!row||(d.itemPaid&&d.itemPaid['inc-'+i]))return;
+    const tot=parseFloat(row.a)||0; if(tot<=0.5)return;
+    const v=prompt(tx('¿Cuánto de "'+(row.l||'esta fuente')+'" ya te llegó? (en camino: S/ '+Math.round(tot)+')','How much of "'+(row.l||'this source')+'" already arrived? (incoming: S/ '+Math.round(tot)+')'),'');
+    if(v===null)return;
+    const got=Math.min(Math.round(parseFloat(v)||0),Math.round(tot)); if(got<=0)return;
+    snapshot(); if(!d.itemPaid)d.itemPaid={};
+    let k='inc-'+i;
+    if(got<tot-0.5){ // parcial: la fila original conserva el resto en camino; lo llegado es fila nueva
+      row.a=tot-got;
+      d.inc.push({l:(row.l||tx('fuente','source'))+' · '+tx('llegó','arrived'),a:got});
+      k='inc-'+(d.inc.length-1);
+    }
+    d.itemPaid[k]=true;
+    if(hasCuentas()){if(!d.incGot)d.incGot={};d.incGot[k]=got;
+      bancoTotal=(parseFloat(bancoTotal)||0)+got;saveBancoTotal();}
+    save();render();}
   else if(b.dataset.itempaid!==undefined){const k=b.dataset.itempaid;if(!d.itemPaid)d.itemPaid={};
     // ✓ en INGRESO = "ya me llegó" → SUBE el contador vivo (simetría exacta con los gastos: ellos
     // restan al salir, esto suma al entrar). Sin ✓ = "por llegar" — la conciliación lo cuenta en
