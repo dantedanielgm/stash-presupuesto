@@ -854,7 +854,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-12.1'; // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-12.2'; // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1860,6 +1860,10 @@ let asigna=null; // modo "mándalo a un lugar específico": {pool, orig} mientra
 function wfDeficit(){const ti=sum(d.inc);let gas=0;buckets.forEach(b=>{const g=b[0];let a=(g==='nec'||g==='luj')?sumCash(d[g]):sum(d[g]);if(g==='aho')a+=debtPaySum();gas+=a;});return Math.max(gas-ti,0);}
 // Mete plata al presupuesto como una línea de ingreso "De tu plata" (crece si ya existe). NO baja tu
 // dinero real — solo le da un trabajo; el dinero baja recién cuando pagas (marcas ✓).
+// Plata en mano que YA está dentro de este ciclo: la que metiste tú (fuente "De tu plata") + la que
+// LLEGÓ de una fuente con ✓ (d.incGot registra cuánto entró a tu mano). Destinarla de nuevo al ciclo
+// la contaría DOBLE: el sueldo que llegó ya es parte del presupuesto — no puede volver a entrar.
+function plataYaDentro(){return (d.inc||[]).reduce((t,r,i)=>t+(r.fromPlata?(parseFloat(r.a)||0):((d.incGot&&d.incGot['inc-'+i])||0)),0);}
 function injectPlata(monto){monto=Math.round(monto);if(monto<=0)return;
   let idx=(d.inc||[]).findIndex(r=>r.fromPlata);
   if(idx>=0){d.inc[idx].a=(parseFloat(d.inc[idx].a)||0)+monto;} else {d.inc.push({l:tx('De tu plata','From your money'),a:monto,fromPlata:true});idx=d.inc.length-1;}
@@ -2083,9 +2087,11 @@ function render(){
   // "Metible" = tu plata real MENOS lo que ya metiste como fuente. Aritmética simple y verificable:
   // tienes 120, metiste 120 → 0 → bloqueado. (NO usar bancoExtra aquí: esa fórmula se contamina
   // cuando el plan está en déficit e inventa plata "sin trabajo" que no existe — bug real cazado por DD.)
-  const yaFromPlata=(d.inc||[]).reduce((t,r)=>t+(r.fromPlata?(parseFloat(r.a)||0):0),0);
-  const metible=hasCuentas()?Math.max(Math.round((parseFloat(bancoTotal)||0)-yaFromPlata),0):0;
-  const yaMetido=yaFromPlata>0.5;
+  // ("yaDentro" incluye también lo LLEGADO de fuentes con ✓ — sin eso, el botón ofrecía re-meter
+  // el sueldo recién llegado y el ciclo se inflaba por encima de su ingreso real.)
+  const yaDentro=plataYaDentro();
+  const metible=hasCuentas()?Math.max(Math.round((parseFloat(bancoTotal)||0)-yaDentro),0):0;
+  const yaMetido=yaDentro>0.5;
   // Banners de frontera de ciclo: (a) este/otro ciclo venció y sigue sin cerrar → invita a cerrarlo
   // (prompted commit: la app detecta la frontera, el humano aprieta el botón); (b) ciclo ya cerrado
   // → muestra su asiento (closeLog) como línea de solo-lectura.
@@ -2126,7 +2132,7 @@ function render(){
         (!d.closed&&!isFutureActive()&&hasCuentas()
           ?(metible>0.5
             ?'<button class="add" data-metermano="1"><span class="p">💰</span> '+tx('Meter mi plata en mano a este ciclo','Put my money on hand into this cycle')+'</button>'
-            :(yaMetido?'<div class="sec-note" style="margin:.35rem 0 0">✓ '+tx('Tu plata en mano ya está dentro de este ciclo (fuente "De tu plata").','Your money on hand is already inside this cycle (source "From your money").')+'</div>':''))
+            :(yaMetido?'<div class="sec-note" style="margin:.35rem 0 0">✓ '+tx('Tu plata en mano ya está dentro de este ciclo (metida por ti o llegada de tus fuentes).','Your money on hand is already inside this cycle (put in by you or arrived from your sources).')+'</div>':''))
           :'')+
         '<div class="tot"><span class="lbl">'+tx('Total de tus fuentes','Total from your sources')+'</span><span class="val" id="tot-inc"></span></div>'+
       '</div>'+
@@ -2502,9 +2508,8 @@ app.addEventListener('click',e=>{
   else if(b.dataset.cerrar){openCierre();}
   else if(b.dataset.wfopen){openWindfall();}
   else if(b.dataset.metadate){openMetaModal();} // 🎂 desde la caja Ahorro — mismo modal que en Reserva
-  else if(b.dataset.metermano){ // tope = plata real − lo ya metido (aritmética simple, imposible duplicar)
-    const yaFP=(d.inc||[]).reduce((t,r)=>t+(r.fromPlata?(parseFloat(r.a)||0):0),0);
-    const max=Math.max(Math.round((parseFloat(bancoTotal)||0)-yaFP),0);
+  else if(b.dataset.metermano){ // tope = plata real − lo YA dentro del ciclo (metido o llegado de fuentes)
+    const max=Math.max(Math.round((parseFloat(bancoTotal)||0)-plataYaDentro()),0);
     if(max<=0)return;
     const v=prompt(tx('¿Cuánto de tu plata en mano destinas a ESTE ciclo? Disponible sin destino: S/ ','How much of your money on hand goes to THIS cycle? Unassigned: S/ ')+max,max);
     if(v===null)return;
@@ -2553,7 +2558,7 @@ app.addEventListener('click',e=>{
     const i=+b.dataset.incpart, row=d.inc[i];
     if(!row||(d.itemPaid&&d.itemPaid['inc-'+i]))return;
     const tot=parseFloat(row.a)||0; if(tot<=0.5)return;
-    const v=prompt(tx('¿Cuánto de "'+(row.l||'esta fuente')+'" ya te llegó? (en camino: S/ '+Math.round(tot)+')','How much of "'+(row.l||'this source')+'" already arrived? (incoming: S/ '+Math.round(tot)+')'),'');
+    const v=prompt(tx('¿Cuánto de "'+(row.l||'esta fuente')+'" ya te llegó? (en camino: S/ '+Math.round(tot)+')\nTu «Tengo ahora» sube solo con esto — no lo escribas también a mano.','How much of "'+(row.l||'this source')+'" already arrived? (incoming: S/ '+Math.round(tot)+')\nYour "On hand" rises by itself — don\'t also type it in manually.'),'');
     if(v===null)return;
     const got=Math.min(Math.round(parseFloat(v)||0),Math.round(tot)); if(got<=0)return;
     snapshot(); if(!d.itemPaid)d.itemPaid={};
