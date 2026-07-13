@@ -866,7 +866,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-13.2'; // ☠️ burbuja ✨/⚠ ELIMINADA (orden DD: el único "sin trabajo" es Tengo ahora sin meter) + "Tengo ahora" abrible también con todo ya destinado // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-13.3'; // línea "Tengo ahora · en camino ▾" en TODOS los ciclos (futuros incluidos: el sueldo llega antes de que el ciclo arranque); meter-plata sigue solo en el presente // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -2135,14 +2135,15 @@ function render(){
         // El número grande ES el botón: tocarlo despliega el desglose de fuentes ahí mismo (sin pantallita aparte)
         '<div class="hi-num" id="hi-num" data-incedit="1" role="button" title="'+tx('Toca para ver y editar tus fuentes','Tap to view and edit your sources')+'"><span id="hi-num-v">—</span><span class="hi-chev">'+(incEdit?'▲':'▾')+'</span></div>'+
         '<div class="hi-sub"><b id="hi-cycle"></b></div>'+
-        // La REALIDAD: tu plata real (editable) + en camino + Reserva. SOLO en el ciclo presente —
-        // en un futuro estás planificando y tu plata no puede ser reclamada por dos planes.
-        (isFutureActive()?'':
-        '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">'+
+        // La REALIDAD: tu plata real (editable) + en camino + Reserva. En TODOS los ciclos igual
+        // (pedido de DD 13 jul: "en camino 4200 y en cuanto vaya recibiendo marcar tanto — que todos
+        // los ciclos se comporten igual"; su sueldo de un ciclo llega ANTES de que el ciclo arranque).
+        // Único candado en futuros: METER plata en mano — eso sí reclamaría la misma plata en dos planes.
+        ('<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Marca lo que va llegando y «en camino» baja solo.','Your actual money right now — cash + accounts. Check what arrives and "incoming" goes down by itself.')+'">'+
           // "Tengo ahora" ES el botón (pedido de DD): con plata sin destino, tocarlo la destina a este
           // ciclo; ya destinada, tocarlo ABRE el desglose para VER que está dentro (pedido de DD 13 jul:
           // "no hay forma de abrirlo y ver que ya está asignada"). Solo es texto plano sin cuentas.
-          ((hasCuentas()&&metible>0.5&&!d.closed)
+          ((hasCuentas()&&metible>0.5&&!d.closed&&!isFutureActive())
             ?'<button class="hi-manolbl" data-metermano="1" title="'+tx('Toca para destinar esta plata a ESTE ciclo','Tap to send this money into THIS cycle')+'">💰 '+tx('Tengo ahora','On hand')+'</button>'
             :(hasCuentas()&&yaMetido
               ?'<button class="hi-manolbl" data-manoinfo="1" title="'+tx('Tu plata ya está destinada a este ciclo — toca para ver el desglose','Your money is already inside this cycle — tap to see the breakdown')+'">💰 '+tx('Tengo ahora','On hand')+'</button>'
@@ -2357,13 +2358,12 @@ function recompute(){
     if(cam)cam.innerHTML=((bx&&bx.porLlegar>0.5)?' · <button class="hi-tag" data-openfuentes="1" title="'+tx('Plata que esperas y aún no llega. Toca el chevron: verás cada fuente pendiente con su «✓ ya me pagó».','Money you expect that hasn\'t arrived. Tap the chevron: each pending source with its "✓ got paid".')+'">📥 '+tx('en camino','incoming')+' S/ '+pn(bx.porLlegar)+' '+(caminoOpen?'▲':'▾')+'</button>':'')+
       ((typeof fondo==='number'&&fondo>0.5)?' · <button class="hi-tag" data-goview="fondo" title="'+tx('Tu plata apartada. Toca para ir a la Reserva.','Your money set aside. Tap to open the Reserve.')+'">🔒 '+tx('Reserva','Reserve')+' '+pn(fondo)+'</button>':'');
     if(bc){
-      // El presente es exclusivo: solo el ciclo EN CURSO reclama tu plata. En un futuro estás planificando.
-      if(fut){bc.innerHTML='<div class="hi-chip-plan">🔮 '+tx('Estás planificando un ciclo futuro — tu plata real se concilia en el ciclo en curso.','You\'re planning a future cycle — your actual money reconciles in the current one.')+'</div>';}
       // ☠️ Los chips ✨/⚠ (juicio plan-vs-realidad de bancoExtra) MURIERON (13 jul, orden directa de DD,
       // 3ª vez que la burbuja lo confunde: 318 fantasma tras re-tipear su plata). Su modelo: re-tipear
       // "Tengo ahora" ES el nuevo punto de verdad; la única plata "sin trabajo" es la de Tengo ahora
       // aún sin meter (subrayado metermano) y lo no asignado vive en "Por asignar" del macro. NO REVIVIRLOS.
-      else {bc.innerHTML='';}
+      // (El chip 🔮 de ciclo futuro también murió: la línea de realidad ahora vive en TODOS los ciclos.)
+      bc.innerHTML='';
     }}
   // Reparto 50/30/20: el chip "↻ 50/30/20" bajo Disponible enciende/apaga esto (showRollover).
   // Reparte el saldo libre ACTUAL en la columna "Repartido" de cada caja. Es la ÚNICA acción sobre
