@@ -496,6 +496,21 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .tpl-empty{font-size:12px; color:var(--tx3); line-height:1.45; margin:0 auto .8rem; max-width:340px}
 /* Salud de tarjetas */
 .salud{background:var(--card); border:1px solid var(--line); border-radius:var(--rad); box-shadow:var(--shadow); padding:1rem 1.1rem; margin:.4rem 0 1.4rem}
+/* 🩺 Estado de tu deuda — tendencia del ciclo + ritmo histórico (pedido DD 13 jul) */
+.dsx{background:var(--card); border:1px solid var(--line); border-radius:var(--rad); box-shadow:var(--shadow); padding:1rem 1.1rem; margin:.4rem 0 1rem}
+.dsx-h{font-size:12px; font-weight:600; color:var(--tx2); margin-bottom:.55rem}
+.dsx-top{display:flex; align-items:baseline; gap:.5rem; margin-bottom:.7rem}
+.dsx-big{font-size:26px; font-weight:800; color:var(--tx); font-variant-numeric:tabular-nums; letter-spacing:-.5px}
+.dsx-lbl{font-size:11.5px; color:var(--tx3)}
+.dsx-stats{display:flex; gap:.6rem}
+.dsx-st{flex:1; background:var(--line2); border-radius:10px; padding:.5rem .65rem; display:flex; flex-direction:column; gap:.1rem}
+.dsx-v{font-size:15px; font-weight:800; font-variant-numeric:tabular-nums}
+.dsx-v.ok{color:var(--ok)} .dsx-v.bad{color:var(--bad)} .dsx-v.mut{color:var(--tx3)}
+.dsx-k{font-size:10.5px; color:var(--tx3); line-height:1.3}
+.dsx-verdict{font-size:12.5px; line-height:1.5; margin-top:.7rem; color:var(--tx)}
+.dsx-verdict.ok b{color:var(--ok)} .dsx-verdict.bad{color:var(--bad)} .dsx-verdict.mut{color:var(--tx2)}
+.dsx-ritmo{font-size:12px; line-height:1.5; margin-top:.45rem; padding-top:.55rem; border-top:1px solid var(--line2); color:var(--tx2)}
+.dsx-ritmo.bad{color:var(--bad)} .dsx-ritmo.mut{color:var(--tx3)}
 .sa-h{font-size:12px; font-weight:600; color:var(--tx2); margin-bottom:.8rem; line-height:1.4}
 .sa-row{display:flex; align-items:center; gap:.6rem; margin-bottom:.5rem}
 .sa-n{flex:0 0 32%; font-size:12.5px; color:var(--tx); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
@@ -867,7 +882,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-13.4'; // ciclo futuro: "Para este ciclo S/ 0" (solo lectura, sube al marcar llegadas) en vez del Tengo ahora global; lo llegado para futuros queda fuera del tope de meter del presente // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-13.5'; // Deudas: tarjeta "🩺 Estado de tu deuda" (total hoy, cancelado vs nueva, ritmo y proyección) + leyenda del semáforo + banners de ciclo solo en Inicio // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1169,6 +1184,7 @@ function applyView(){
   if(inicio){ applyFocus(); }
   else { budgetSecs.forEach(id=>setD(id,false)); setD('focusnav',false); }
   setD('heart', inicio);
+  setD('app-banners', inicio); // banners de ciclo (cerrado/ciérrala/backup/reparto): solo en Inicio
   const tog=document.getElementById('focus-toggle');if(tog)tog.style.display=inicio?'':'none';
   // (reset/plantillas/backup viven en ⚙ Ajustes — ya no hay nada que ocultar por tab aquí)
   // El informe es la LECTURA del ciclo (lo ejecutado real) → tab propio: al fondo de Inicio nadie
@@ -2144,7 +2160,9 @@ function render(){
       :'<div class="close-banner">📅 <b>'+cycleLabel(pcyc)+'</b> '+tx('terminó','ended')+(pcyc.end?' '+tx('el ','on ')+fmtFecha(pcyc.end):'')+' '+tx('y sigue sin cerrar.','and is still open.')+'<button class="cb-btn" data-gocierre="'+pcyc.id+'">'+tx('Revisar y cerrar →','Review & close →')+'</button></div>'):'')+
     // Recordatorio de respaldo: los datos viven SOLO en este navegador — sin copia, un borrado los mata.
     (backupDue()?'<div class="close-banner">🛟 '+tx('Tus datos viven solo en este navegador. Descarga tu copia de seguridad — toma 1 toque.','Your data lives only in this browser. Download your backup — it takes 1 tap.')+'<button class="cb-btn" data-export="1">⬇ '+tx('Descargar copia','Download backup')+'</button><button class="cb-later" data-backuplater="1">'+tx('luego','later')+'</button></div>':'');
-  document.getElementById('app').innerHTML= bannersH +
+  // Banners envueltos: son noticias del CICLO en Inicio — en Deudas/Reserva/Informe estorban
+  // (DD 13 jul: "ciclo cerrado sobró 400 no debería ir en Deudas"). applyView los oculta por tab.
+  document.getElementById('app').innerHTML= '<div id="app-banners">'+bannersH+'</div>' +
     '<div class="sec" id="sec-inc" style="margin-top:.5rem">'+
       '<div class="hero-inc">'+
         '<div class="hi-lbl">'+tx('presupuesto del ciclo','cycle budget')+'</div>'+
@@ -3150,6 +3168,53 @@ function tjInner(){
       (r.sobre>0.5?' · '+tx('Sobrecosto','Extra cost')+' <b style="color:var(--bad)">'+pe(r.sobre)+'</b>':' · <b style="color:var(--ok)">'+tx('sin sobrecosto','no extra cost')+'</b>')+'</div>':'');
 }
 function refreshTJ(){const b=document.getElementById('tjbox');if(b)b.innerHTML=tjInner();}
+// 🩺 Estado de tu deuda — la TENDENCIA (pedido de DD 13 jul: "cuánto cancelé, cuánta deuda nueva,
+// si voy por buen camino, si debo seguir a ese ritmo"). Este ciclo usa la MISMA verdad que el
+// Informe (ejecutadoDetalle: pagos asentados + aho que "se fue"; cargas = tarjeteo nuevo). El ritmo
+// sale del historial de ciclos CERRADOS (paidAmt = el asiento de cada uno). La FOTO por tarjeta
+// (utilización vs línea) sigue viviendo en saludH, abajo.
+function estadoDeudaH(){
+  const vivas=debts.filter(x=>!x.auto&&(parseFloat(x.total)||0)>0.5);
+  const totalHoy=vivas.reduce((t,x)=>t+(parseFloat(x.total)||0),0);
+  const e=(typeof ejecutadoDetalle==='function')?ejecutadoDetalle():{deudaBanco:0,ahoSeFue:0};
+  const pagado=e.deudaBanco+e.ahoSeFue;
+  const cargas=sumTj(d.nec||[])+sumTj(d.luj||[]);
+  if(totalHoy<=0.5&&pagado<=0.5&&cargas<=0.5)return '';
+  const neto=pagado-cargas;
+  // Historial: neto (pagado − cargado) de cada ciclo cerrado con movimiento
+  const hist=[];
+  (cycles||[]).forEach(c=>{ if(c.id===activeQ)return;
+    try{const x=JSON.parse(localStorage.getItem(keyFor(c.id))); if(!x||!x.closed)return;
+      const p=x.paidAmt?Object.keys(x.paidAmt).reduce((t,k)=>t+(parseFloat(x.paidAmt[k])||0),0):0;
+      const cg=sumTj(x.nec||[])+sumTj(x.luj||[]);
+      if(p>0.5||cg>0.5)hist.push(p-cg);
+    }catch(err){}});
+  const ritmo=hist.length?hist.reduce((a,b)=>a+b,0)/hist.length:0;
+  let verdict;
+  if(pagado<=0.5&&cargas<=0.5)verdict='<div class="dsx-verdict mut">'+tx('Este ciclo aún no registras pagos ni cargos de deuda.','No debt payments or charges logged this cycle yet.')+'</div>';
+  else if(neto>0.5)verdict='<div class="dsx-verdict ok">✅ '+tx('Este ciclo tu deuda <b>bajó','This cycle your debt went <b>down')+' '+pe(neto)+'</b>.</div>';
+  else if(neto<-0.5)verdict='<div class="dsx-verdict bad">🔴 '+tx('Este ciclo tu deuda <b>creció','This cycle your debt <b>grew')+' '+pe(-neto)+'</b> — '+tx('cargaste más de lo que pagaste.','you charged more than you paid.')+'</div>';
+  else verdict='<div class="dsx-verdict mut">➖ '+tx('Este ciclo pagaste casi lo mismo que cargaste — tu deuda se mantuvo.','You paid about as much as you charged — debt held steady.')+'</div>';
+  let ritmoH='';
+  if(hist.length&&ritmo>0.5&&totalHoy>0.5){
+    const n=Math.ceil(totalHoy/ritmo);
+    const dias=(cycleOf(activeQ).type==='m')?30:15;
+    const fin=new Date(); fin.setDate(fin.getDate()+n*dias);
+    const MES=lang==='en'?['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']:['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    ritmoH='<div class="dsx-ritmo">⏱ '+tx('Tu ritmo: bajas ~','Your pace: down ~')+pe(ritmo)+tx(' por ciclo. Si lo mantienes, quedas libre en ~',' per cycle. Keep it up and you\'re debt-free in ~')+n+' '+tx('ciclos','cycles')+' (≈ '+MES[fin.getMonth()]+' '+fin.getFullYear()+').</div>';
+  } else if(hist.length&&ritmo<-0.5){
+    ritmoH='<div class="dsx-ritmo bad">⏱ '+tx('Tu tendencia: la deuda viene CRECIENDO ~','Your trend: debt has been GROWING ~')+pe(-ritmo)+tx(' por ciclo. Frenar el tarjeteo es lo primero.',' per cycle. Stopping card charges comes first.')+'</div>';
+  } else if(!hist.length){
+    ritmoH='<div class="dsx-ritmo mut">⏱ '+tx('Cierra tu primer ciclo con pagos y aquí verás tu ritmo y cuándo quedarías libre.','Close your first cycle with payments and your pace + debt-free date show up here.')+'</div>';
+  }
+  return '<div class="dsx">'+
+    '<div class="dsx-h">🩺 '+tx('Estado de tu deuda','Your debt status')+'</div>'+
+    '<div class="dsx-top"><span class="dsx-big">'+pe(totalHoy)+'</span><span class="dsx-lbl">'+tx('debes hoy en total','total owed today')+'</span></div>'+
+    '<div class="dsx-stats">'+
+      '<div class="dsx-st"><span class="dsx-v ok">'+pe(pagado)+'</span><span class="dsx-k">✓ '+tx('cancelaste este ciclo','paid off this cycle')+'</span></div>'+
+      '<div class="dsx-st"><span class="dsx-v '+(cargas>0.5?'bad':'mut')+'">'+pe(cargas)+'</span><span class="dsx-k">💳 '+tx('deuda nueva este ciclo','new debt this cycle')+'</span></div>'+
+    '</div>'+verdict+ritmoH+'</div>';
+}
 function saludH(){
   const cards=debts.filter(isCardDebt);
   if(!cards.length) return '';
@@ -3337,7 +3402,8 @@ function renderDebts(){
   el.innerHTML=
     '<div id="debts-mgmt">'+
       '<h2>'+tx('Deudas','Debts')+'</h2>'+
-      '<div class="dnote">'+tx('Lo que debes, cuándo vence y cómo vas — rojo, ámbar o verde. Tus datos nunca salen de tu compu.','What you owe, when it\'s due and how you\'re doing — red, amber or green. Your data never leaves your device.')+'</div>'+
+      '<div class="dnote">'+tx('Lo que debes y cuándo vence. El punto: 🟢 al día · 🟡 vence en 7 días o menos · 🔴 vencida o sobre el tope. Tus datos nunca salen de tu compu.','What you owe and when it\'s due. The dot: 🟢 on track · 🟡 due within 7 days · 🔴 overdue or over the limit. Your data never leaves your device.')+'</div>'+
+      estadoDeudaH()+
       (vivas.length
         ? vivas.map(r=>debtStatusRowH(r.x,r.i)).join('')
         : '<div class="dnote" style="margin:.8rem 0">'+tx('No tienes deudas activas. Si tienes un préstamo o una tarjeta, agrégalos y Stash los mete a tu plan del ciclo.','No active debts. If you have a loan or a credit card, add them and Stash works them into your cycle plan.')+'</div>')+
