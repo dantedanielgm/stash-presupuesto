@@ -220,6 +220,8 @@ body.focuson .reset{display:none}
 .hcl-go{font:inherit; font-size:11.5px; font-weight:800; color:#fff; background:var(--ok); border:none; border-radius:999px; padding:.28rem .6rem; cursor:pointer; white-space:nowrap}
 .hcl-go:active{transform:scale(.95)}
 .hcl-empty{font-size:12px; color:var(--tx3); padding:.2rem 0}
+.hcl-all{display:block; width:100%; margin-top:.4rem; font:inherit; font-size:12px; font-weight:800; color:var(--ok); background:transparent; border:1.5px dashed var(--ok); border-radius:999px; padding:.35rem .6rem; cursor:pointer}
+.hcl-all:active{transform:scale(.97)}
 /* La realidad en el hero: en mano (editable) + en camino + chip contextual */
 .hi-mano{margin-top:.7rem; font-size:14px; font-weight:600; color:var(--tx2); display:inline-flex; align-items:center; gap:.15rem; flex-wrap:wrap; justify-content:center}
 .hi-mano input{width:88px; font:inherit; font-size:18px; font-weight:800; color:var(--tx); text-align:right; background:transparent; border:none; border-bottom:1.5px dashed var(--line); padding:0 2px}
@@ -864,7 +866,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-12.3'; // unificado: acordeón "en camino" (esta sesión) + ½ parcial y candado plataYaDentro (sesión celular) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-13.1'; // "Llegó todo — ajustar al real" + ½ acepta montos mayores + la Reserva ya no renace como "sin trabajo" al re-tipear tu plata // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1709,10 +1711,17 @@ function bancoExtra(){ // null = sin cuentas · extra>0 plata sin trabajo · ext
   // "fuga" cuando el sueldo simplemente no había llegado — y tapaba el botón de tu plata en mano).
   const porLlegar=(d.inc||[]).reduce((t,r,i)=>t+((d.itemPaid&&d.itemPaid['inc-'+i])?0:(parseFloat(r.a)||0)),0);
   // Ecuación completa (cada sol, presente y futuro, con un trabajo):
-  //   en mano + por llegar = pendiente de pagar + libre del plan + SIN TRABAJO
+  //   en mano + por llegar = pendiente de pagar + libre del plan + RESERVA + SIN TRABAJO
   // saldoPlan va SIN clamp: si el plan está en déficit, ese hueco también lo cubre tu plata en mano.
   const saldoPlan=lastSaldo||0;
-  return {extra:total+porLlegar-pendiente-saldoPlan, pendiente, libre:Math.max(saldoPlan,0), saldoPlan, total, porLlegar};
+  // La RESERVA explica excedente pero nunca acusa fuga (clamp asimétrico). Tu apartado vive
+  // físicamente en las mismas cuentas que tipeas en "Tengo ahora": sin esto, cada re-tipeo del
+  // número real resucitaba la Reserva como plata "sin trabajo" aunque ya tuviera destino — la
+  // burbuja zombie de los 338 (prima del bug de los 318). Y va con Math.min (no resta directa)
+  // porque quien guarda su Reserva FUERA de lo que tipea no debe ver una "fuga" fantasma.
+  const raw=total+porLlegar-pendiente-saldoPlan;
+  const fx=Math.max(parseFloat(fondo)||0,0);
+  return {extra:raw-Math.min(fx,Math.max(raw,0)), pendiente, libre:Math.max(saldoPlan,0), saldoPlan, total, porLlegar};
 }
 function windfallPlan(extra){
   const props=[]; let resto=extra;
@@ -2038,9 +2047,9 @@ function rowH(g,i,r){
     (asigna&&g!=='inc'?'<button class="asigna-btn" data-asignar="'+g+'-'+i+'" title="Mandar plata aquí">+ S/</button>':'')+
     (canTj?'<button class="tjt'+(r.tj?' on':'')+'" data-tjt="1" data-grp="'+g+'" data-idx="'+i+'" title="'+(r.tj?'En tarjeta: '+esc(r.tjCard||''):'Pagar con tarjeta')+'">'+TJ_SVG+'</button>':'')+
     '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" aria-label="Eliminar">&times;</button>'+
-    // ½ solo en fuentes EN CAMINO (sin ✓): "me llegó una parte" — divide la fuente sin tocar el total
+    // ½ solo en fuentes EN CAMINO (sin ✓): "me llegó otro monto" — menos divide la fuente, más la ajusta
     (g==='inc'?((!paid&&(parseFloat(r.a)||0)>0.5)
-      ?'<button class="pcheck pchk-part" data-incpart="'+i+'" title="'+tx('Me llegó una parte (no todo). Lo llegado pasa a tu plata en mano; el resto sigue en camino.','Part of it arrived (not all). What arrived joins your money on hand; the rest stays incoming.')+'">½</button>'
+      ?'<button class="pcheck pchk-part" data-incpart="'+i+'" title="'+tx('Me llegó otro monto. Menos: lo llegado pasa a tu plata en mano y el resto sigue en camino. Más: la fuente se ajusta al monto real.','A different amount arrived. Less: what arrived joins your money on hand, the rest stays incoming. More: the source adjusts to the real amount.')+'">½</button>'
       :'<span class="pchk-sp"></span>'):'')+
     '<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'" title="'+(g==='inc'?tx('Ya me llegó esta plata','This money arrived'):(g==='aho'?tx('Ya lo aparté','Set aside'):tx('Ya pagué esto','I paid this')))+'">'+(paid?'✓':'')+'</button>'+'</div>';
   if(canTj && tjOpen===(g+'-'+i)) h+=tjPickerH(g,i,null,r);
@@ -2140,7 +2149,10 @@ function render(){
         // Marcar = esa plata pasa a "Tengo ahora" y en camino queda el resto.
         (caminoOpen
           ?'<div class="hi-caminolist">'+(caminoRows.length
-            ?caminoRows.map(x=>'<div class="hcl-row"><span class="hcl-n">'+esc(x.r.l||tx('Fuente','Source'))+'</span><span class="hcl-a">S/ '+pn(parseFloat(x.r.a)||0)+'</span><button class="hcl-part" data-incpart="'+x.i+'" title="'+tx('Me llegó una parte','Part of it arrived')+'">½</button><button class="hcl-go" data-itempaid="inc-'+x.i+'">✓ '+tx('ya me pagó','got paid')+'</button></div>').join('')
+            ?caminoRows.map(x=>'<div class="hcl-row"><span class="hcl-n">'+esc(x.r.l||tx('Fuente','Source'))+'</span><span class="hcl-a">S/ '+pn(parseFloat(x.r.a)||0)+'</span><button class="hcl-part" data-incpart="'+x.i+'" title="'+tx('Me llegó otro monto (menos o más)','A different amount arrived (less or more)')+'">½</button><button class="hcl-go" data-itempaid="inc-'+x.i+'">✓ '+tx('ya me pagó','got paid')+'</button></div>').join('')
+              // "Llegó todo": un solo toque marca TODAS las pendientes; si el total real fue otro
+              // (te pagaron más o menos), el presupuesto del ciclo se ajusta a lo que DE VERDAD llegó.
+              +'<button class="hcl-all" data-caminoall="1">✓ '+tx('Llegó todo — ajustar al monto real','All arrived — adjust to actual')+'</button>'
             :'<div class="hcl-empty">'+tx('Nada en camino — todo lo esperado ya llegó.','Nothing incoming — everything expected already arrived.')+'</div>')+'</div>'
           :''))+
         '<div id="banco-cta" class="hi-chip"></div>'+
@@ -2572,23 +2584,46 @@ app.addEventListener('click',e=>{
   else if(b.dataset.deldebt!==undefined){snapshot();const i=+b.dataset.deldebt;const nm=debts[i]&&debts[i].n;debts.splice(i,1);if(nm&&d.debtPay)delete d.debtPay[nm];saveDebts();save();render();renderDebts();}
   else if(b.dataset.debtmode!==undefined){const nm=b.dataset.debtmode,mo=b.dataset.m;if(mo==='otro'&&!promptOtroMonto(nm))return;if(!d.debtPay)d.debtPay={};d.debtPay[nm]=mo;save();render();}
   else if(b.dataset.debtpaid!==undefined){toggleDebtPaid(b.dataset.debtpaid);}
-  else if(b.dataset.incpart!==undefined){ // ½ en INGRESO = "me llegó una parte": divide la fuente en dos —
+  else if(b.dataset.caminoall){ // "Llegó todo": marca TODAS las fuentes en camino de un golpe. Si el
+    // total real fue OTRO (te pagaron más o menos de lo presupuestado), el presupuesto se ajusta a la
+    // realidad: de más → fila nueva "Llegó de más" ya recibida; de menos → se descuenta de las últimas.
+    const rows=(d.inc||[]).map((r,i)=>({r,i})).filter(x=>!(d.itemPaid&&d.itemPaid['inc-'+x.i])&&(parseFloat(x.r.a)||0)>0);
+    if(!rows.length)return;
+    const esp=Math.round(rows.reduce((t,x)=>t+(parseFloat(x.r.a)||0),0));
+    const v=prompt(tx('Esperabas S/ '+esp+' en camino. ¿Cuánto te llegó EN TOTAL?\nSi fue más o menos, pon el monto REAL — tu presupuesto se ajusta solo.\nTu «Tengo ahora» sube solo con esto — no lo escribas también a mano.','You expected S/ '+esp+' incoming. How much arrived IN TOTAL?\nIf it was more or less, type the REAL amount — your budget adjusts itself.\nYour "On hand" rises by itself — don\'t also type it in manually.'),esp);
+    if(v===null)return;
+    const real=Math.round(parseFloat(v)||0); if(real<=0)return;
+    snapshot(); if(!d.itemPaid)d.itemPaid={}; if(!d.incGot)d.incGot={};
+    let diff=real-esp;
+    if(diff<0){ // llegó menos: el faltante se descuenta de las últimas fuentes hacia atrás
+      for(let j=rows.length-1;j>=0&&diff<0;j--){const a=parseFloat(rows[j].r.a)||0;const cut=Math.min(a,-diff);rows[j].r.a=a-cut;diff+=cut;}
+    }
+    rows.forEach(x=>{const amt=parseFloat(x.r.a)||0;const k='inc-'+x.i;d.itemPaid[k]=true;
+      if(hasCuentas()&&amt>0.5){d.incGot[k]=amt;bancoTotal=(parseFloat(bancoTotal)||0)+amt;}});
+    if(diff>0.5){ // llegó más: el extra entra como fuente propia, nacida ya recibida
+      d.inc.push({l:tx('Llegó de más','Extra arrived'),a:diff});
+      const k='inc-'+(d.inc.length-1);d.itemPaid[k]=true;
+      if(hasCuentas()){d.incGot[k]=diff;bancoTotal=(parseFloat(bancoTotal)||0)+diff;}}
+    if(hasCuentas())saveBancoTotal();
+    save();render();}
+  else if(b.dataset.incpart!==undefined){ // ½ en INGRESO = "me llegó otro monto": divide la fuente en dos —
     // lo llegado nace como fila con ✓ (sube tu plata en mano por el MISMO camino que el check completo:
-    // d.incGot + bancoTotal) y el resto queda en camino. El total de fuentes NO cambia: 1400 esperados
-    // siguen siendo 900 ✓ + 500 📥. Si dices que llegó todo, equivale a tocar el ✓.
+    // d.incGot + bancoTotal) y el resto queda en camino. Menos de lo esperado: 1400 esperados
+    // siguen siendo 900 ✓ + 500 📥. MÁS de lo esperado (te pagaron 419.50 y presupuestaste 400):
+    // la fuente se AJUSTA al monto real — tu presupuesto pasa a reflejar lo que de verdad llegó.
     const i=+b.dataset.incpart, row=d.inc[i];
     if(!row||(d.itemPaid&&d.itemPaid['inc-'+i]))return;
     const tot=parseFloat(row.a)||0; if(tot<=0.5)return;
-    const v=prompt(tx('¿Cuánto de "'+(row.l||'esta fuente')+'" ya te llegó? (en camino: S/ '+Math.round(tot)+')\nTu «Tengo ahora» sube solo con esto — no lo escribas también a mano.','How much of "'+(row.l||'this source')+'" already arrived? (incoming: S/ '+Math.round(tot)+')\nYour "On hand" rises by itself — don\'t also type it in manually.'),'');
+    const v=prompt(tx('¿Cuánto de "'+(row.l||'esta fuente')+'" ya te llegó? (en camino: S/ '+Math.round(tot)+')\nSi te pagaron MÁS, pon el monto real — la fuente se ajusta sola.\nTu «Tengo ahora» sube solo con esto — no lo escribas también a mano.','How much of "'+(row.l||'this source')+'" already arrived? (incoming: S/ '+Math.round(tot)+')\nIf you got paid MORE, type the real amount — the source adjusts itself.\nYour "On hand" rises by itself — don\'t also type it in manually.'),'');
     if(v===null)return;
-    const got=Math.min(Math.round(parseFloat(v)||0),Math.round(tot)); if(got<=0)return;
+    const got=Math.round(parseFloat(v)||0); if(got<=0)return;
     snapshot(); if(!d.itemPaid)d.itemPaid={};
     let k='inc-'+i;
     if(got<tot-0.5){ // parcial: la fila original conserva el resto en camino; lo llegado es fila nueva
       row.a=tot-got;
       d.inc.push({l:(row.l||tx('fuente','source'))+' · '+tx('llegó','arrived'),a:got});
       k='inc-'+(d.inc.length-1);
-    }
+    } else if(got>tot+0.5){row.a=got;} // llegó MÁS: la fuente adopta el monto real (presupuesto honesto)
     d.itemPaid[k]=true;
     if(hasCuentas()){if(!d.incGot)d.incGot={};d.incGot[k]=got;
       bancoTotal=(parseFloat(bancoTotal)||0)+got;saveBancoTotal();}
