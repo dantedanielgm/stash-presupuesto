@@ -212,6 +212,14 @@ body.focuson .reset{display:none}
 .hi-manolbl:hover{color:var(--accent)}
 .hi-tag{font:inherit; font-size:inherit; font-weight:inherit; color:inherit; background:transparent; border:none; padding:0; cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px}
 .hi-tag:hover{color:var(--accent)}
+/* Acordeón "en camino": lo pendiente, una fila por fuente, con su botón "✓ ya me pagó" */
+.hi-caminolist{margin:.5rem auto 0; max-width:340px; text-align:left; background:var(--line2); border-radius:10px; padding:.45rem .65rem}
+.hcl-row{display:flex; align-items:center; gap:.55rem; padding:.3rem 0; font-size:13px; color:var(--tx)}
+.hcl-n{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.hcl-a{font-weight:800; font-variant-numeric:tabular-nums}
+.hcl-go{font:inherit; font-size:11.5px; font-weight:800; color:#fff; background:var(--ok); border:none; border-radius:999px; padding:.28rem .6rem; cursor:pointer; white-space:nowrap}
+.hcl-go:active{transform:scale(.95)}
+.hcl-empty{font-size:12px; color:var(--tx3); padding:.2rem 0}
 /* La realidad en el hero: en mano (editable) + en camino + chip contextual */
 .hi-mano{margin-top:.7rem; font-size:14px; font-weight:600; color:var(--tx2); display:inline-flex; align-items:center; gap:.15rem; flex-wrap:wrap; justify-content:center}
 .hi-mano input{width:88px; font:inherit; font-size:18px; font-weight:800; color:var(--tx); text-align:right; background:transparent; border:none; border-bottom:1.5px dashed var(--line); padding:0 2px}
@@ -366,6 +374,8 @@ body.focuson .ov-bar{display:none}
 .pchk-part{border-style:dashed; color:var(--tx3); font-size:11px}
 .pchk-part:hover{color:var(--accent)}
 .row .pchk-sp{width:22px; flex:none}
+.hcl-part{font:inherit; font-size:11px; font-weight:800; color:var(--tx3); background:transparent; border:2px dashed var(--line); border-radius:6px; width:26px; height:22px; cursor:pointer; flex:none; padding:0}
+.hcl-part:hover{color:var(--accent); border-color:var(--accent)}
 .pl.is-paid{opacity:.5}
 .row.sub.is-paid{opacity:.55}
 .paidbar{display:flex; gap:.8rem; font-size:12.5px; color:var(--tx2); margin:.2rem 0 .8rem; padding:.5rem .7rem; background:var(--line2); border-radius:var(--rad-sm)}
@@ -854,7 +864,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-12.2'; // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-12.3'; // unificado: acordeón "en camino" (esta sesión) + ½ parcial y candado plataYaDentro (sesión celular) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1126,6 +1136,7 @@ let showRollover=true; // por defecto ON: el reparto 50/30/20 (disponible por se
 let lastSaldo=0; // último saldo libre calculado (para congelar el rollover)
 let collapsed={aho:true,nec:true,luj:true,balance:true}; // al abrir: 3 cajas + balance colapsados
 let incEdit=false; // editar/agregar ingreso (oculto por defecto; el ingreso se ve grande arriba)
+let caminoOpen=false; // acordeón de "en camino": lista SOLO lo pendiente, con "✓ ya me pagó" por fuente
 let view='inicio'; // tab activo: inicio (las 3 cajas) | plan | deudas | informe
 // Modo enfocado (wizard): una sola caja a la vez. Arranca APAGADO → se ve el overview de las 3 cajas.
 let focusMode=false, focusStep=0, lastOver=0;
@@ -2028,7 +2039,7 @@ function rowH(g,i,r){
     (canTj?'<button class="tjt'+(r.tj?' on':'')+'" data-tjt="1" data-grp="'+g+'" data-idx="'+i+'" title="'+(r.tj?'En tarjeta: '+esc(r.tjCard||''):'Pagar con tarjeta')+'">'+TJ_SVG+'</button>':'')+
     '<button class="rm" data-grp="'+g+'" data-idx="'+i+'" aria-label="Eliminar">&times;</button>'+
     // ½ solo en fuentes EN CAMINO (sin ✓): "me llegó una parte" — divide la fuente sin tocar el total
-    (g==='inc'?(!paid&&(parseFloat(amt)||0)>0.5
+    (g==='inc'?((!paid&&(parseFloat(r.a)||0)>0.5)
       ?'<button class="pcheck pchk-part" data-incpart="'+i+'" title="'+tx('Me llegó una parte (no todo). Lo llegado pasa a tu plata en mano; el resto sigue en camino.','Part of it arrived (not all). What arrived joins your money on hand; the rest stays incoming.')+'">½</button>'
       :'<span class="pchk-sp"></span>'):'')+
     '<button class="pcheck pchk-paid'+(paid?' on':'')+'" data-itempaid="'+g+'-'+i+'" title="'+(g==='inc'?tx('Ya me llegó esta plata','This money arrived'):(g==='aho'?tx('Ya lo aparté','Set aside'):tx('Ya pagué esto','I paid this')))+'">'+(paid?'✓':'')+'</button>'+'</div>';
@@ -2092,6 +2103,10 @@ function render(){
   const yaDentro=plataYaDentro();
   const metible=hasCuentas()?Math.max(Math.round((parseFloat(bancoTotal)||0)-yaDentro),0):0;
   const yaMetido=yaDentro>0.5;
+  // Fuentes PENDIENTES (sin ✓ = aún no llegan): la lista del acordeón "en camino". Una por compañía;
+  // su "✓ ya me pagó" mete esa plata a "Tengo ahora" y en camino queda solo el resto.
+  const caminoRows=(d.inc||[]).map((r2,i2)=>({r:r2,i:i2}))
+    .filter(x=>!(d.itemPaid&&d.itemPaid['inc-'+x.i])&&(parseFloat(x.r.a)||0)>0);
   // Banners de frontera de ciclo: (a) este/otro ciclo venció y sigue sin cerrar → invita a cerrarlo
   // (prompted commit: la app detecta la frontera, el humano aprieta el botón); (b) ciclo ya cerrado
   // → muestra su asiento (closeLog) como línea de solo-lectura.
@@ -2120,7 +2135,14 @@ function render(){
           ((hasCuentas()&&metible>0.5&&!d.closed)
             ?'<button class="hi-manolbl" data-metermano="1" title="'+tx('Toca para destinar esta plata a ESTE ciclo','Tap to send this money into THIS cycle')+'">💰 '+tx('Tengo ahora','On hand')+'</button>'
             :'💰 '+tx('Tengo ahora','On hand'))+
-          ' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"><span class="hi-camino" id="hi-camino"></span></div>')+
+          ' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"><span class="hi-camino" id="hi-camino"></span></div>'+
+        // Acordeón "en camino": SOLO lo pendiente, una fila por fuente/compañía con su "✓ ya me pagó".
+        // Marcar = esa plata pasa a "Tengo ahora" y en camino queda el resto.
+        (caminoOpen
+          ?'<div class="hi-caminolist">'+(caminoRows.length
+            ?caminoRows.map(x=>'<div class="hcl-row"><span class="hcl-n">'+esc(x.r.l||tx('Fuente','Source'))+'</span><span class="hcl-a">S/ '+pn(parseFloat(x.r.a)||0)+'</span><button class="hcl-part" data-incpart="'+x.i+'" title="'+tx('Me llegó una parte','Part of it arrived')+'">½</button><button class="hcl-go" data-itempaid="inc-'+x.i+'">✓ '+tx('ya me pagó','got paid')+'</button></div>').join('')
+            :'<div class="hcl-empty">'+tx('Nada en camino — todo lo esperado ya llegó.','Nothing incoming — everything expected already arrived.')+'</div>')+'</div>'
+          :''))+
         '<div id="banco-cta" class="hi-chip"></div>'+
       '</div>'+
       // Desglose de FUENTES: se abre tocando el número grande. ("Me pagan el" vive en el ✎ del ciclo.)
@@ -2317,7 +2339,7 @@ function recompute(){
     // El desglose de tu realidad en una línea — cada pieza es TOCABLE y explica de dónde nace:
     // "en camino" = tus fuentes aún sin ✓. Chevron ▾/▲ = acordeón: toca y las fuentes se abren
     // ahí abajo, con su monto y su check (pedido literal de DD).
-    if(cam)cam.innerHTML=((bx&&bx.porLlegar>0.5)?' · <button class="hi-tag" data-openfuentes="1" title="'+tx('Fuentes que aún no marcas como recibidas. Toca para verlas — su ✓ es «ya me llegó».','Sources you haven\'t checked as received yet. Tap to view — their ✓ means "it arrived".')+'">📥 '+tx('en camino','incoming')+' S/ '+pn(bx.porLlegar)+' '+(incEdit?'▲':'▾')+'</button>':'')+
+    if(cam)cam.innerHTML=((bx&&bx.porLlegar>0.5)?' · <button class="hi-tag" data-openfuentes="1" title="'+tx('Plata que esperas y aún no llega. Toca el chevron: verás cada fuente pendiente con su «✓ ya me pagó».','Money you expect that hasn\'t arrived. Tap the chevron: each pending source with its "✓ got paid".')+'">📥 '+tx('en camino','incoming')+' S/ '+pn(bx.porLlegar)+' '+(caminoOpen?'▲':'▾')+'</button>':'')+
       ((typeof fondo==='number'&&fondo>0.5)?' · <button class="hi-tag" data-goview="fondo" title="'+tx('Tu plata apartada. Toca para ir a la Reserva.','Your money set aside. Tap to open the Reserve.')+'">🔒 '+tx('Reserva','Reserve')+' '+pn(fondo)+'</button>':'');
     if(bc){
       // El presente es exclusivo: solo el ciclo EN CURSO reclama tu plata. En un futuro estás planificando.
@@ -2494,8 +2516,7 @@ app.addEventListener('click',e=>{
   else if(b.dataset.focustoggle){focusMode=!focusMode;focusStep=0;applyFocus();window.scrollTo({top:0,behavior:'smooth'});}
   else if(b.dataset.paid!==undefined){toggleDebtPaid(b.dataset.paid);}
   else if(b.dataset.goview){view=b.dataset.goview;applyView();window.scrollTo({top:0,behavior:'smooth'});}
-  else if(b.dataset.openfuentes){incEdit=!incEdit;render(); // acordeón: abre/cierra las fuentes bajo el hero
-    if(incEdit)setTimeout(()=>{const el=document.getElementById('inc-detail');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});},60);}
+  else if(b.dataset.openfuentes){caminoOpen=!caminoOpen;render();} // chevron de "en camino": abre/cierra la lista de pendientes ahí mismo
   else if(b.dataset.incedit){incEdit=!incEdit;render();}
   else if(b.dataset.collapse!==undefined){collapsed[b.dataset.collapse]=!collapsed[b.dataset.collapse];render();}
   else if(b.dataset.collapseall){const anyOpen=Object.values(collapsed).some(v=>!v);['aho','nec','luj'].forEach(g=>collapsed[g]=anyOpen);render();}
