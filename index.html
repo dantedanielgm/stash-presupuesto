@@ -866,7 +866,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-13.1'; // "Llegó todo — ajustar al real" + ½ acepta montos mayores + la Reserva ya no renace como "sin trabajo" al re-tipear tu plata // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-13.2'; // ☠️ burbuja ✨/⚠ ELIMINADA (orden DD: el único "sin trabajo" es Tengo ahora sin meter) + "Tengo ahora" abrible también con todo ya destinado // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -2139,11 +2139,14 @@ function render(){
         // en un futuro estás planificando y tu plata no puede ser reclamada por dos planes.
         (isFutureActive()?'':
         '<div class="hi-mano" title="'+tx('Tu plata real en este momento — efectivo + cuentas. Stash la compara con el plan para avisarte si estás cubierto.','Your actual money right now — cash + accounts. Stash compares it with the plan to tell you if you\'re covered.')+'">'+
-          // "Tengo ahora" ES el botón (pedido de DD): tocarlo destina plata a este ciclo. Si ya no hay
-          // plata sin destino, es texto plano — sin chips extra.
+          // "Tengo ahora" ES el botón (pedido de DD): con plata sin destino, tocarlo la destina a este
+          // ciclo; ya destinada, tocarlo ABRE el desglose para VER que está dentro (pedido de DD 13 jul:
+          // "no hay forma de abrirlo y ver que ya está asignada"). Solo es texto plano sin cuentas.
           ((hasCuentas()&&metible>0.5&&!d.closed)
             ?'<button class="hi-manolbl" data-metermano="1" title="'+tx('Toca para destinar esta plata a ESTE ciclo','Tap to send this money into THIS cycle')+'">💰 '+tx('Tengo ahora','On hand')+'</button>'
-            :'💰 '+tx('Tengo ahora','On hand'))+
+            :(hasCuentas()&&yaMetido
+              ?'<button class="hi-manolbl" data-manoinfo="1" title="'+tx('Tu plata ya está destinada a este ciclo — toca para ver el desglose','Your money is already inside this cycle — tap to see the breakdown')+'">💰 '+tx('Tengo ahora','On hand')+'</button>'
+              :'💰 '+tx('Tengo ahora','On hand')))+
           ' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0"><span class="hi-camino" id="hi-camino"></span></div>'+
         // Acordeón "en camino": SOLO lo pendiente, una fila por fuente/compañía con su "✓ ya me pagó".
         // Marcar = esa plata pasa a "Tengo ahora" y en camino queda el resto.
@@ -2356,14 +2359,10 @@ function recompute(){
     if(bc){
       // El presente es exclusivo: solo el ciclo EN CURSO reclama tu plata. En un futuro estás planificando.
       if(fut){bc.innerHTML='<div class="hi-chip-plan">🔮 '+tx('Estás planificando un ciclo futuro — tu plata real se concilia en el ciclo en curso.','You\'re planning a future cycle — your actual money reconciles in the current one.')+'</div>';}
-      else if(d.closed){bc.innerHTML='';}
-      else if(!bx){bc.innerHTML='';}
-      // Con el plan en DÉFICIT: silencio. El rojo ya se ve en las cajas — y la fórmula de "sin
-      // trabajo" se contamina con el déficit (inventaba 318 que no existían: bug cazado por DD).
-      // El chip ✨ solo habla cuando el plan cuadra Y hay plata de verdad sin destino.
-      else if(typeof wfDeficit==='function'&&wfDeficit()>0.5){bc.innerHTML='';}
-      else if(bx.extra>0.5){bc.innerHTML='<button class="hi-chip-btn ok" data-wfopen="1">✨ S/ '+pn(bx.extra)+' '+tx('sin trabajo — dale un destino →','with no job — give it one →')+'</button>';}
-      else if(bx.extra<-0.5){bc.innerHTML='<div class="hi-chip-warn">⚠ '+tx('Te faltan','You\'re short')+' S/ '+pn(-bx.extra)+' '+tx('para tu plan. ¿Un gasto sin registrar, o un ingreso que aún no marcas?','for your plan. An unlogged expense, or income you haven\'t checked yet?')+'</div>';}
+      // ☠️ Los chips ✨/⚠ (juicio plan-vs-realidad de bancoExtra) MURIERON (13 jul, orden directa de DD,
+      // 3ª vez que la burbuja lo confunde: 318 fantasma tras re-tipear su plata). Su modelo: re-tipear
+      // "Tengo ahora" ES el nuevo punto de verdad; la única plata "sin trabajo" es la de Tengo ahora
+      // aún sin meter (subrayado metermano) y lo no asignado vive en "Por asignar" del macro. NO REVIVIRLOS.
       else {bc.innerHTML='';}
     }}
   // Reparto 50/30/20: el chip "↻ 50/30/20" bajo Disponible enciende/apaga esto (showRollover).
@@ -2539,7 +2538,10 @@ app.addEventListener('click',e=>{
   else if(b.dataset.deltpl!==undefined){const n=b.dataset.deltpl;if(confirm(tx('¿Borrar la plantilla "'+n+'"?','Delete template "'+n+'"?'))){saveTpls(loadTemplates().filter(x=>x.name!==n));render();}}
   else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
   else if(b.dataset.cerrar){openCierre();}
-  else if(b.dataset.wfopen){openWindfall();}
+  else if(b.dataset.wfopen){openWindfall();} // (inalcanzable desde el 13 jul: el chip ✨ murió; queda por si algo viejo lo dispara)
+  else if(b.dataset.manoinfo){ // "Tengo ahora" con todo ya destinado: abre el desglose y muestra el estado
+    incEdit=true;render();
+    const el=document.getElementById('inc-detail');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});}
   else if(b.dataset.metadate){openMetaModal();} // 🎂 desde la caja Ahorro — mismo modal que en Reserva
   else if(b.dataset.metermano){ // tope = plata real − lo YA dentro del ciclo (metido o llegado de fuentes)
     const max=Math.max(Math.round((parseFloat(bancoTotal)||0)-plataYaDentro()),0);
