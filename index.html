@@ -882,7 +882,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-13.6'; // quincenas 1/2 y 2/2 por punto medio + "Repartir lo libre" OFF por defecto (elección persistida) + log de Reserva sin pares +580/−580 (deshacer borra el asiento) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-13.7'; // etiqueta de quincena "Julio Q1" / "Julio Q2" (formato corto pedido por DD) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1057,7 +1057,8 @@ function cycleLabel(c){
       // start (ej. 2ª quincena arrancando el 11) y ambas decían "· 1/2" (bug cazado por DD 13 jul).
       let mm=m, half=(dd<=15?'1':'2');
       if(c.end){const mid=new Date((dateVal(c.start)+dateVal(c.end))/2); if(!isNaN(mid.getTime())){mm=mid.getMonth()+1; half=(mid.getDate()<=15?'1':'2');}}
-      return tx('Quincena ','Half-month ')+cap(MESESL()[mm-1])+' · '+half+'/2';
+      // Formato corto pedido por DD 13 jul: "Julio Q1" en vez de "Quincena Julio · 1/2"
+      return cap(MESESL()[mm-1])+' Q'+half;
     }
     return tx('Periodo ','Period ')+cycleNum(c);
   }
