@@ -882,7 +882,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-16.1'; // fixes del testeo usuario-nuevo: onboarding preselecciona la quincena de HOY (antes nacía un ciclo vencido) + "+ Préstamo/Tarjeta" ya no crea deudas fantasma invisibles // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-16.2'; // ✓ de deuda BAJA el saldo real (destildar restaura) + cierre con toggle 📋 "el siguiente arranca con esta estructura" + Tengo ahora nace en 0 (en camino visible desde el día 1) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1612,7 +1612,9 @@ function openCierre(){
   const debtPend=Object.keys(d.debtPay||{}).filter(n=>debts.some(x=>x.n===n&&!x.auto)&&!(d.paid&&d.paid[n]))
     .map(n=>({n,amt:debtAmt(snapOf(n)||debts.find(z=>z.n===n)||{},d.debtPay[n]||'min'),carry:true}));
   const cyc=cycleOf(activeQ), anticipado=!!(cyc.end&&isoToday()<cyc.end);
-  cierre={ing,ahoPend,debtPend,destino:null,defTrato:null,anticipado,arrancaHoy:anticipado};
+  // copia:true por defecto — la fricción #1 del uso sostenido era re-armar cada ciclo desde cero
+  // (testeo usuario-nuevo 16 jul: ~8 montos + deudas re-tipeados por quincena).
+  cierre={ing,ahoPend,debtPend,destino:null,defTrato:null,anticipado,arrancaHoy:anticipado,copia:true};
   renderCierre();
   const ov=document.getElementById('cierre-ovl'); if(ov)ov.hidden=false;
 }
@@ -1660,6 +1662,10 @@ function renderCierre(){
     h+='<div class="ci-sec"><button class="ci-tog'+(c.arrancaHoy?' on':'')+'" data-cihoy="1" style="width:100%;text-align:left">'+(c.arrancaHoy?'✓ ':'')+tx('El siguiente ciclo arranca HOY','The next cycle starts TODAY')+' ('+fmtFecha(isoToday())+')</button>'+
       '<div class="ci-note">'+tx('Estás cerrando antes de tiempo. Actívalo para que el próximo ciclo cubra desde hoy y las fechas cuadren con tu realidad.','You\'re closing early. Turn this on so the next cycle covers from today and the dates match your reality.')+'</div></div>';
   }
+  // El siguiente puede nacer ARMADO: hereda fuentes y categorías con sus montos, sin los ✓ (todo
+  // vuelve a "por pagar" / "en camino"). Solo aplica a grupos del siguiente que estén vacíos.
+  h+='<div class="ci-sec"><button class="ci-tog'+(c.copia?' on':'')+'" data-cicopy="1" style="width:100%;text-align:left">'+(c.copia?'✓ ':'')+'📋 '+tx('El siguiente arranca con la estructura de este ciclo','Next cycle starts with this cycle\'s structure')+'</button>'+
+    '<div class="ci-note">'+tx('Copia tus fuentes y categorías con sus montos, sin los ✓ — no vuelves a armar todo de cero. Lo que ya exista en el siguiente ciclo se respeta.','Copies your sources and categories with their amounts, without the ✓ — no rebuilding from scratch. Anything already in the next cycle is respected.')+'</div></div>';
   const need=(res>0.5&&!c.destino)||(resto>0.5&&!c.defTrato);
   h+='<div class="ci-btns"><button class="ci-cancel" data-cicancel="1">'+tx('Cancelar','Cancel')+'</button><button class="ci-go" data-cigo="1"'+(need?' disabled':'')+'>'+tx('Cerrar ciclo →','Close cycle →')+'</button></div>';
   el.innerHTML=h;
@@ -1694,6 +1700,23 @@ function commitCierre(){
   const idx=cycles.findIndex(x=>x.id===activeQ);
   const nid=(idx>=0&&idx<cycles.length-1)?cycles[idx+1].id:createCycle(cycleOf(activeQ).type);
   const nx=load(nid);
+  // 4b) Estructura heredada (toggle 📋 del cierre): fuentes y categorías con montos, SIN los ✓ —
+  // el siguiente nace armado y todo vuelve a "por pagar"/"en camino". Respeta lo ya existente:
+  // solo puebla grupos del siguiente que estén en cero (las cuotas de metas ya sembradas ahí ganan).
+  // No copia banderas de tarjeta (tj) — tarjetear es decisión de CADA ciclo, y evita duplicar cuotas.
+  if(c.copia){
+    const cleanCat=r=>{const o={l:r.l,a:r.a};
+      if(Array.isArray(r.sub))o.sub=r.sub.map(s=>({l:s.l,a:s.a}));
+      return o;};
+    ['nec','luj','aho'].forEach(g=>{ if(sum(nx[g]||[])<=0.5&&sum(d[g]||[])>0.5) nx[g]=(d[g]||[]).map(cleanCat); });
+    if(sum(nx.inc||[])<=0.5){
+      const propias=(d.inc||[]).filter(r=>!r.fromPlata
+        &&!/^(Sobrante del ciclo anterior|Déficit del ciclo anterior|Surplus from previous cycle|Deficit from previous cycle)/.test(r.l||'')
+        &&!/^(Llegó de más|Extra arrived)/.test(r.l||'')
+        &&(parseFloat(r.a)||0)>0.5);
+      if(propias.length)nx.inc=propias.map(r=>({l:r.l,a:r.a}));
+    }
+  }
   c.debtPend.filter(x=>x.carry).forEach(x=>{const n=x.n;
     if(!nx.debtPay)nx.debtPay={}; nx.debtPay[n]=(d.debtPay&&d.debtPay[n])||'min';
     if(d.debtPay&&d.debtPay[n]==='otro'){if(!nx.otroMonto)nx.otroMonto={};nx.otroMonto[n]=d.otroMonto&&d.otroMonto[n];}
@@ -1720,6 +1743,7 @@ function commitCierre(){
     else if(b.dataset.cidest){cierre.destino=b.dataset.cidest;renderCierre();}
     else if(b.dataset.cidef){cierre.defTrato=b.dataset.cidef;renderCierre();}
     else if(b.dataset.cihoy){cierre.arrancaHoy=!cierre.arrancaHoy;renderCierre();}
+    else if(b.dataset.cicopy){cierre.copia=!cierre.copia;renderCierre();}
     else if(b.dataset.cicancel){cierre=null;ov.hidden=true;}
     else if(b.dataset.cigo){commitCierre();}
   });})();
@@ -2566,8 +2590,10 @@ app.addEventListener('click',e=>{
   if(dap){const sel=Object.keys(d.debtPay||{}).filter(n=>debts.some(x=>x.n===n&&!x.auto)); if(!sel.length)return;
     const allPaid=sel.every(n=>d.paid&&d.paid[n]); snapshot();
     if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={};
+    if(allPaid)sel.forEach(n=>revertPaidDelta(n)); // el saldo real vuelve ANTES de borrar paidAmt
     cashDelta(()=>{sel.forEach(n=>{ if(allPaid){delete d.paid[n];delete d.paidAmt[n];}
       else {const s=snapOf(n)||debts.find(z=>z.n===n)||{}; d.paid[n]=true; d.paidAmt[n]=debtAmt(s,(d.debtPay[n])||'min');} });});
+    if(!allPaid)sel.forEach(n=>applyPaidDelta(n)); // y baja al marcar (mismo efecto que el ✓ individual)
     save(); if(typeof renderDebts==='function')renderDebts(); render(); return;}
   const kap=e.target.closest('[data-kindallpaid]'); // check de Préstamo/Tarjeta: marca/desmarca los de ESE tipo
   if(kap){const kind=kap.dataset.kindallpaid;
@@ -2575,8 +2601,10 @@ app.addEventListener('click',e=>{
     if(!sel.length)return;
     const allPaid=sel.every(n=>d.paid&&d.paid[n]); snapshot();
     if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={};
+    if(allPaid)sel.forEach(n=>revertPaidDelta(n));
     cashDelta(()=>{sel.forEach(n=>{ if(allPaid){delete d.paid[n];delete d.paidAmt[n];}
       else {const s=snapOf(n)||debts.find(z=>z.n===n)||{}; d.paid[n]=true; d.paidAmt[n]=debtAmt(s,(d.debtPay[n])||'min');} });});
+    if(!allPaid)sel.forEach(n=>applyPaidDelta(n));
     save(); if(typeof renderDebts==='function')renderDebts(); render(); return;}
   const kcl=e.target.closest('[data-kindclear]'); // × de Préstamo/Tarjeta: quita del ciclo las de ese tipo
   if(kcl){const kind=kcl.dataset.kindclear;
@@ -2659,7 +2687,9 @@ app.addEventListener('click',e=>{
     if(!promptOtroMonto(nm,def))return; if(!d.debtPay)d.debtPay={};d.debtPay[nm]='otro';
     if(x){if(!d.debtSnap)d.debtSnap={};d.debtSnap[nm]=snapCapture(x);}save();render();}
   else if(b.dataset.loanamt!==undefined){if(promptOtroMonto(b.dataset.loanamt)){save();render();}}
-  else if(b.dataset.unpick!==undefined){const nm=b.dataset.unpick;cashDelta(()=>{if(d.debtPay)delete d.debtPay[nm];if(d.debtSnap)delete d.debtSnap[nm];if(d.paid)delete d.paid[nm];if(d.paidAmt)delete d.paidAmt[nm];});save();render();}
+  else if(b.dataset.unpick!==undefined){const nm=b.dataset.unpick;
+    revertPaidDelta(nm); // si estaba ✓, el saldo real vuelve exacto antes de quitarla del ciclo
+    cashDelta(()=>{if(d.debtPay)delete d.debtPay[nm];if(d.debtSnap)delete d.debtSnap[nm];if(d.paid)delete d.paid[nm];if(d.paidAmt)delete d.paidAmt[nm];});save();render();}
   else if(b.dataset.newdebt){debtForm={kind:b.dataset.newdebt,idx:'new'};render();}
   else if(b.dataset.editdebt!==undefined){debtForm={kind:b.dataset.kind,idx:+b.dataset.editdebt};render();}
   else if(b.dataset.debtformcancel){debtForm=null;render();}
@@ -3070,15 +3100,52 @@ function debtPaySum(){if(!d.debtPay)return 0;return debts.filter(x=>!x.auto).red
 // Marcar/desmarcar pago de deuda: SOLO un check. NO toca los datos reales de la deuda (esos se
 // actualizan en el tab Deudas — fuente para ciclos futuros). El presupuesto muestra la FOTO congelada,
 // así que el min/disponible NO cambian al pagar. pago = monto de la foto, para el ejecutado.
+// Deshace el efecto del ✓ sobre la deuda REAL (restaura el saldo exacto que había). Lo usan
+// destildar el check y el ✗ de quitar la deuda del ciclo — "me equivoqué" no puede costar plata.
+function revertPaidDelta(name){
+  const pd=d.paidDelta&&d.paidDelta[name]; if(!pd)return;
+  const x=debts.find(z=>z.n===name);
+  if(x){ if(pd.f==='disp'){ x.disp=pd.from; const lim=parseFloat(x.limite)||0; x.total=Math.max(lim-(parseFloat(x.disp)||0),0); }
+    else { x.total=pd.from; }
+    saveDebts(); }
+  delete d.paidDelta[name];
+}
 function toggleDebtPaid(name){
   if(!d.paid)d.paid={}; if(!d.paidAmt)d.paidAmt={};
   snapshot();
+  const marcando=!d.paid[name];
   cashDelta(()=>{
     if(d.paid[name]){ delete d.paid[name]; delete d.paidAmt[name]; }
     else { const s=snapOf(name)||debts.find(z=>z.n===name)||{};
       d.paid[name]=true; d.paidAmt[name]=debtAmt(s,(d.debtPay&&d.debtPay[name])||'min'); }
   });
+  if(marcando)applyPaidDelta(name); else revertPaidDelta(name);
   save(); if(typeof renderDebts==='function')renderDebts(); render();
+}
+// El ✓ ahora TAMBIÉN baja la deuda REAL (pedido DD 16 jul — cerraba la disonancia "pagué mi cuota
+// y sigo debiendo igual", cazada en el testeo usuario-nuevo). Préstamo: el saldo baja por lo pagado.
+// Tarjeta con línea: sube el DISPONIBLE (el saldo se deriva línea−disp, el modelo de siempre).
+// La FOTO del ciclo (debtSnap/paidAmt) NO se toca — el plan presupuestado sigue congelado; lo que
+// cambia es la verdad del banco de deudas (la que alimenta ciclos futuros y el 🩺). Destildar
+// restaura EXACTO (d.paidDelta guarda de-dónde-a-dónde). El interés que el banco sume después lo
+// corriges cuando quieras con el ✎ del tab Deudas, como siempre.
+function applyPaidDelta(name){
+  const x=debts.find(z=>z.n===name);
+  const amt=parseFloat(d.paidAmt&&d.paidAmt[name])||0;
+  if(!x||amt<=0.5)return;
+  if(!d.paidDelta)d.paidDelta={};
+  if(d.paidDelta[name])return; // ya aplicado — no duplicar
+  const lim=parseFloat(x.limite)||0;
+  if(isCardDebt(x)&&lim>0){
+    const nuevoDisp=Math.min((parseFloat(x.disp)||0)+amt,lim);
+    d.paidDelta[name]={f:'disp',from:x.disp,to:nuevoDisp};
+    x.disp=nuevoDisp; x.total=Math.max(lim-nuevoDisp,0);
+  } else {
+    const nuevoTotal=Math.max((parseFloat(x.total)||0)-amt,0);
+    d.paidDelta[name]={f:'total',from:x.total,to:nuevoTotal};
+    x.total=nuevoTotal;
+  }
+  saveDebts();
 }
 // Ejecutado/real POR CAJA: lo ya marcado como pagado. nec/luj/aho = categorías con ✓ (efectivo);
 // aho además suma los pagos de deuda asentados (los checks de deuda viven en Ahorro).
@@ -3570,6 +3637,9 @@ function finishOnboarding(){
   cycles=[{id:'c1',type:type,start:start,end:end,label:tx('Ciclo 1','Cycle 1')}];saveCycles();
   activeQ='c1';localStorage.setItem('midas_active_cycle',activeQ);localStorage.setItem('midas_onboarded','1');
   d=def(); d.inc=[{l:tx('Presupuesto','Budget'),a:welMonto}]; save();
+  // "Tengo ahora" nace en 0 (no vacío): sin esto el usuario nuevo no veía "📥 en camino" ni la línea
+  // de realidad hasta descubrir solo que debía tipear su plata (testeo usuario-nuevo 16 jul).
+  if(bancoTotal===''){bancoTotal='0';saveBancoTotal();}
   showWelcome(false);view='inicio';incEdit=false;applyLang();window.scrollTo({top:0});
 }
 document.getElementById('welcome').addEventListener('click',e=>{
