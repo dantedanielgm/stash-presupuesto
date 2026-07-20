@@ -637,11 +637,14 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .fab-gasto{position:fixed; right:1rem; bottom:4.4rem; z-index:60; font:inherit; font-size:13.5px; font-weight:800; color:#fff; background:var(--accent); border:none; border-radius:999px; padding:.75rem 1.05rem; box-shadow:0 4px 14px rgba(0,0,0,.25); cursor:pointer}
 .fab-gasto:active{transform:scale(.96)}
 /* Apartar: misma burbuja azul que el gasto, pero quieta bajo las cajas, con su explicación al costado */
-#sec-apartar{padding:.7rem 1.1rem}
-.apartar-row{display:flex; align-items:center; gap:.7rem}
-.apartar-fab{font:inherit; font-size:13.5px; font-weight:800; color:#fff; background:var(--accent); border:none; border-radius:999px; padding:.65rem 1.05rem; cursor:pointer; white-space:nowrap; flex:none}
-.apartar-fab:active{transform:scale(.96)}
-.apartar-note{font-size:11.5px; color:var(--tx3); line-height:1.35}
+/* Registrar: los 2 verbos de captura (Gasto / Apartar) como familia bajo un header (opción D, DD 20 jul) */
+#sec-apartar{padding:.85rem 1.1rem}
+.reg-h{font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--tx3); margin-bottom:.6rem}
+.reg-row{display:flex; align-items:center; gap:.7rem; margin-bottom:.5rem}
+.reg-row:last-child{margin-bottom:0}
+.reg-fab{font:inherit; font-size:13px; font-weight:800; color:#fff; background:var(--accent); border:none; border-radius:999px; padding:.6rem .95rem; cursor:pointer; white-space:nowrap; flex:none; min-width:118px; text-align:center}
+.reg-fab:active{transform:scale(.96)}
+.reg-note{font-size:11.5px; color:var(--tx3); line-height:1.35}
 .gs-amt{display:flex; align-items:center; gap:.4rem; margin:.6rem 0 .8rem; font-size:22px; font-weight:800; color:var(--tx)}
 .gs-amt input{flex:1; font:inherit; font-size:26px; font-weight:800; color:var(--tx); background:var(--line2); border:1.5px solid var(--line); border-radius:12px; padding:.55rem .7rem; width:100%; min-width:0}
 .gs-date{display:flex; align-items:center; gap:.5rem; font-size:12.5px; color:var(--tx2); margin:.55rem 0 .8rem}
@@ -898,7 +901,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-20.7'; // el débito a la tarjeta ocurre al marcar el ✓ (elegir tarjeta = plan; el check = la compra real); destildar devuelve el disponible exacto // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-20.8'; // sección "⚡ Registrar" bajo las cajas: Gasto y Apartar como familia con header (el + Gasto flotante sigue siendo el atajo diario) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -2365,11 +2368,14 @@ function render(){
       '<div class="paybar-l" id="paybar-l" style="display:none"><span class="pbl-paid" id="pbl-paid"></span><span class="pbl-rest" id="pbl-rest"></span></div>'+
     '</div>'+
     buckets.map((b,i)=>bucketH(b[0],b[1],b[2],i+1)).join('')+
-    // APARTAR — verbo global hermano de "+ Gasto" (decisión DD 20 jul): guardar plata con destino
-    // es OCASIONAL (no merece burbuja flotante como el gasto diario) → burbuja azul IGUAL a la de
-    // gasto pero quieta bajo las 3 cajas, con la explicación al costado (DD: el 🔒 confundía).
-    // ÚNICA puerta al motor de metas; la pestaña Reserva queda solo para VER el progreso.
-    '<div class="sec" id="sec-apartar"><div class="apartar-row"><button class="apartar-fab" data-apartar="1">+ '+tx('Apartar','Set aside')+'</button><span class="apartar-note">'+tx('guarda plata con destino — en cuotas o hasta una fecha','save money with a destination — in installments or by a date')+'</span></div></div>'+
+    // REGISTRAR — los dos verbos de captura, mostrados como FAMILIA bajo un header (opción D elegida
+    // por DD 20 jul): "Gasto" = plata que salió; "Apartar" = plata que guardo con destino. El "+ Gasto"
+    // aquí es catálogo/explicación (el FAB flotante sigue siendo el atajo diario — gasto es diario,
+    // apartar es ocasional). Así la conexión entre hermanos se VE, sin robarle velocidad al gasto.
+    '<div class="sec" id="sec-apartar"><div class="reg-h">⚡ '+tx('Registrar','Record')+'</div>'+
+      '<div class="reg-row"><button class="reg-fab" data-gasto="1">💸 + '+tx('Gasto','Expense')+'</button><span class="reg-note">'+tx('plata que ya salió — se descuenta al instante','money that already left — deducted on the spot')+'</span></div>'+
+      '<div class="reg-row"><button class="reg-fab" data-apartar="1">🔒 + '+tx('Apartar','Set aside')+'</button><span class="reg-note">'+tx('plata que guardas con destino — en cuotas o hasta una fecha','money you save with a destination — in installments or by a date')+'</span></div>'+
+    '</div>'+
     // (Sección Balance eliminada: "en mano" vive en el hero, el asesor es un chip contextual ahí mismo,
     //  y "Cerrar ciclo" se mudó al editor del ciclo — el lápiz ✎ de la barra.)
     '<div class="sec" id="sec-informe"><div class="sec-h"><span class="t">📊 '+tx('Informe del ciclo','Cycle report')+'</span></div><div id="informe-body"></div></div>';
@@ -2729,6 +2735,7 @@ app.addEventListener('click',e=>{
     incEdit=true;render();
     const el=document.getElementById('inc-detail');if(el)el.scrollIntoView({behavior:'smooth',block:'center'});}
   else if(b.dataset.apartar){openMetaModal();} // 🔒 Apartar — la única puerta al motor de metas (20 jul)
+  else if(b.dataset.gasto){openGasto();} // 💸 Gasto desde la sección Registrar (el FAB flotante es el atajo diario)
   else if(b.dataset.metermano){ // tope = plata real − lo YA dentro del ciclo − lo llegado para ciclos futuros
     const max=Math.max(Math.round((parseFloat(bancoTotal)||0)-plataYaDentro()-plataDeFuturos()),0);
     if(max<=0)return;
