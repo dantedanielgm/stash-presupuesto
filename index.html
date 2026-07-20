@@ -898,7 +898,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-20.6'; // en Deudas, toda la fila de la tarjeta/préstamo abre el editor (murió el lapicito ✎; chevron ▸/▲ indica el estado) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-20.7'; // el débito a la tarjeta ocurre al marcar el ✓ (elegir tarjeta = plan; el check = la compra real); destildar devuelve el disponible exacto // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -2945,17 +2945,22 @@ function reconcileTjDebts(){
       }
     });});
   });
-  // DÉBITO REAL a la tarjeta (regla DD 20 jul: "todo interrelacionado"). Cargar X a una tarjeta baja
-  // su disponible X y sube su saldo — como en la vida real, al instante. Se aplica como DELTA
-  // idempotente vía x.tjHold (cuánto tiene retenido HOY por cargos): correrlo mil veces no acumula;
-  // quitar el cargo o bajar el monto devuelve el disponible EXACTO. Editar el disponible a mano
-  // resetea el hold (el nuevo número es tu "punto de partida" y los cargos se re-aplican encima).
-  const desired={}; // nombre de tarjeta -> total cargado en ciclos VIVOS (los cerrados ya se saldaron al cerrar)
+  // DÉBITO REAL a la tarjeta (regla DD 20 jul: "todo interrelacionado") — pero SOLO al marcar el ✓
+  // (afinado por DD mismo día): elegir tarjeta = PLAN ("esto lo pagaré con la CMR", la tarjeta ni se
+  // entera); el ✓ = la COMPRA REAL → recién ahí baja el disponible y sube el saldo. Destildar lo
+  // devuelve exacto. Igual que todo en Stash: el check es el punto de compromiso. Se aplica como
+  // DELTA idempotente vía x.tjHold (cuánto tiene retenido HOY por cargos ✓): correrlo mil veces no
+  // acumula; con subs, cada sub ✓ debita su parte incremental. Editar el disponible a mano resetea
+  // el hold (el nuevo número es tu "punto de partida" y los cargos ✓ se re-aplican encima).
+  const desired={}; // nombre de tarjeta -> total COMPRADO (✓) en ciclos VIVOS (los cerrados ya se saldaron al cerrar)
   cycles.forEach(c=>{const x=(c.id===activeQ)?d:load(c.id); if(x&&x.closed)return;
-    ['nec','luj'].forEach(g=>{(x[g]||[]).forEach(r=>{
-      const hasS=r.sub&&r.sub.length;
-      if(r.tj&&r.tjCard){const m=hasS?r.sub.reduce((t,s)=>t+(parseFloat(s.a)||0),0):(parseFloat(r.a)||0);if(m>0)desired[r.tjCard]=(desired[r.tjCard]||0)+m;}
-      else if(hasS){r.sub.forEach(s=>{if(s.tj&&s.tjCard){const m=parseFloat(s.a)||0;if(m>0)desired[s.tjCard]=(desired[s.tjCard]||0)+m;}});}
+    const pd=x.itemPaid||{};
+    ['nec','luj'].forEach(g=>{(x[g]||[]).forEach((r,i)=>{
+      const hasS=r.sub&&r.sub.length, catPaid=!!pd[g+'-'+i];
+      if(r.tj&&r.tjCard){ // categoría entera en tarjeta: debita lo ya comprado (subs ✓, o todo si el padre está ✓)
+        const m=hasS?r.sub.reduce((t,s,j)=>t+((catPaid||pd[g+'-'+i+'-'+j])?(parseFloat(s.a)||0):0),0):(catPaid?(parseFloat(r.a)||0):0);
+        if(m>0)desired[r.tjCard]=(desired[r.tjCard]||0)+m;
+      } else if(hasS){r.sub.forEach((s,j)=>{if(s.tj&&s.tjCard&&(catPaid||pd[g+'-'+i+'-'+j])){const m=parseFloat(s.a)||0;if(m>0)desired[s.tjCard]=(desired[s.tjCard]||0)+m;}});}
     });});});
   manual.forEach(x=>{ if(!isCardDebt(x))return;
     const want=Math.round((desired[x.n]||0)*100)/100, have=Math.round((parseFloat(x.tjHold)||0)*100)/100;
