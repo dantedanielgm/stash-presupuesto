@@ -788,6 +788,9 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 .cyc-main{display:flex; align-items:center; justify-content:center; gap:.5rem}
 .cyc-hoy{font:inherit; font-size:11px; font-weight:700; color:var(--accent); background:transparent; border:1px solid var(--accent); border-radius:999px; padding:.22rem .55rem; cursor:pointer; white-space:nowrap}
 .cyc-hoy:active{transform:scale(.95)}
+.cyc-estado{text-align:center; font-size:10px; font-weight:700; letter-spacing:.04em; margin-top:.25rem}
+.cyc-estado.aqui{color:var(--ok)}
+.cyc-estado.lejos{color:#c68a0c}
 .cyc-addrow{display:flex; gap:.4rem; justify-content:center}
 .cyc-edit{font:inherit; font-size:12px; line-height:1; width:24px; height:24px; border:1px solid var(--line); border-radius:7px; background:var(--card); color:var(--tx3); cursor:pointer; transition:.15s; margin-left:.15rem}
 .cyc-edit:hover,.cyc-edit.on{border-color:var(--accent); color:var(--accent)}
@@ -919,7 +922,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-20.11'; // pagar una tarjeta PREGUNTA tu nuevo disponible (sugerido: disp+pago, editable por el interés) — restaurado el prompt que DD tenía configurado // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-20.12'; // abrir = aterrizar en el ciclo actual + barra dice "● ciclo actual" o "N ciclos antes/después" + picker solo tarjetas reales y colapsa tras elegir (adiós selección accidental al deslizar) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1135,6 +1138,15 @@ function renderCycleBar(){
       '<button class="cyc-nav" data-cycnav="1"'+(idx>=cycles.length-1?' disabled':'')+'>›</button>'+
       '<button class="cyc-edit'+(cycEdit?' on':'')+'" data-cycedit="1" title="'+tx('Editar fechas de este ciclo','Edit this cycle\'s dates')+'">✎</button>'+
     '</div>'+
+    // Estado bajo el label (pedido DD 20 jul: "me estuve perdiendo entre ciclos sin saber cuál era el
+    // actual"): en casa un "● ciclo actual" verde; fuera, CUÁNTOS ciclos te separan y hacia dónde —
+    // así al deslizar siempre sabes dónde estás parado respecto a hoy. Visible en TODAS las pestañas.
+    '<div class="cyc-estado '+(fuera?'lejos':'aqui')+'">'+(fuera
+      ? (function(){const ih=cycles.findIndex(c=>c.id===hoyId), dn=idx-ih;
+          return dn>0
+            ? '▸ '+dn+' '+(dn===1?tx('ciclo DESPUÉS del actual','cycle AFTER current'):tx('ciclos DESPUÉS del actual','cycles AFTER current'))
+            : '◂ '+(-dn)+' '+(-dn===1?tx('ciclo ANTES del actual','cycle BEFORE current'):tx('ciclos ANTES del actual','cycles BEFORE current'));})()
+      : '● '+tx('ciclo actual','current cycle'))+'</div>'+
     // Un solo "+" (crear ciclo) — al tocarlo despliega las 3 opciones. Tres botones crípticos
     // (+Q/+M/+P) siempre visibles eran ruido y se confundían con el ✎ (que edita el actual).
     '<div class="cyc-addrow">'+(cycAddOpen
@@ -1203,6 +1215,7 @@ function createCycle(type){
 }
 function addCycle(type){switchCycle(createCycle(type));}
 let tjOpen=null; // "g-i" de la línea con el selector de tarjeta abierto
+let tjPickAll=false; // true = mostrar la lista completa de tarjetas aunque ya haya una elegida ("Cambiar de tarjeta")
 // Modo guiado por escenas: Ahorro → Gustos → Necesidades → Plan quincenal.
 const WIZ=['sec-aho','sec-luj','sec-nec','planbox'];
 let wizStep=0;
@@ -1328,9 +1341,9 @@ function createCycleForToday(type){
     const k=cycles.findIndex(c=>c.id===hoyCyc.id);
     if(k>=0&&cycles[k+1]&&cycles[k+1].id===activeQ){cur.start=hoy;saveCycles();}
   }
-  // La fecha es un empujón hacia ADELANTE, nunca una correa hacia atrás: si te paraste en un ciclo
-  // FUTURO a propósito (a planificar) y no lo cerraste, te respeta ahí — no te jala al presente.
-  if(cur.start&&cur.start>hoy&&!isClosed(activeQ))return;
+  // Al ABRIR la app aterrizas SIEMPRE en el ciclo del presente (decisión DD 20 jul: "me estuve
+  // perdiendo entre ciclos sin saber cuál era el actual"). El respeto al parqueo-en-futuro del 11 jul
+  // murió: planificar un futuro es un paseo DENTRO de la sesión — cada apertura arranca en casa.
   if(cur.start&&cur.end&&cur.start<=hoy&&hoy<=cur.end&&!isClosed(activeQ))return; // el guardado sigue vigente
   let id=cycleForToday();
   // Si el ciclo de hoy ya se CERRÓ, tu presente es el siguiente sin cerrar (cerrar = pasar la página;
@@ -2160,7 +2173,10 @@ function subRowH(g,i,j,s){const canTj=(g==='nec'||g==='luj');
 
 function tjPickerH(g,i,j,r){
   const sj=(j!=null?' data-sub="'+j+'"':''); // identidad de subcategoría en los data-attrs
-  const cards=(typeof debts!=='undefined'?debts:[]).filter(x=>!x.auto&&!/pr[eé]stamo|colegio/i.test(x.n||''));
+  // SOLO tarjetas DE VERDAD: kind card, o con línea/disponible declarados. El filtro viejo era una
+  // adivinanza por nombre (excluía solo "préstamo/colegio") y colaba los préstamos de DD (Doctorsol,
+  // Refrichivi, Gastos Nat, Uni Nati) como candidatas con "añade su línea" — cazado 20 jul.
+  const cards=(typeof debts!=='undefined'?debts:[]).filter(x=>!x.auto&&(x.kind==='card'||(parseFloat(x.limite)||0)>0||(x.disp!=null&&x.disp!=='')));
   if(!cards.length) return '<div class="tjpicker"><div class="tjpicker-h">Agrega tus tarjetas en el módulo de Deudas (abajo) para elegir una.</div></div>';
   const monto=hasSubs(r)?sum(r.sub):(parseFloat(r.a)||0);
   const avail=c=>cardAvail(c);
@@ -2188,7 +2204,25 @@ function tjPickerH(g,i,j,r){
   const cuotaBox = r.tj
     ? '<div class="tjcuotas">Cargo <b>'+pe(monto)+'</b> en <input type="number" min="1" step="1" data-tjcuotas="1" data-grp="'+g+'" data-idx="'+i+'"'+sj+' value="'+cuotas+'"> cuotas → <b id="tjcuota">'+pe(monto/cuotas)+'</b>/mes</div>'
     : '';
-  return '<div class="tjpicker" id="tjpick-'+g+'-'+i+(j!=null?'-'+j:'')+'">'+
+  // COLAPSADO tras elegir (DD 20 jul: al deslizar por la lista, el dedo seleccionaba OTRA tarjeta
+  // sin querer — y un cargo solo puede vivir en UNA). Con tarjeta elegida, la lista desaparece: ves
+  // la tuya en azul (inerte, no cambia por tocarla), cuotas, "Cambiar de tarjeta" reabre la lista,
+  // quitar y Hecho. El cambio de tarjeta pasa a ser un acto DELIBERADO, no un roce del scroll.
+  const elegida=(r.tj&&r.tjCard)?cards.find(c=>c.n===r.tjCard):null;
+  const colapsado=!!elegida && !tjPickAll;
+  const idAttr=' id="tjpick-'+g+'-'+i+(j!=null?'-'+j:'')+'"';
+  if(colapsado){
+    const av=avail(elegida);
+    return '<div class="tjpicker"'+idAttr+'>'+
+      '<div class="tjpicker-h">'+tx('Este cargo va en:','This charge goes on:')+'</div>'+
+      '<div class="tjpick sel" style="cursor:default"><span class="tjnm">'+esc(elegida.n)+'</span><span class="tjright"><span class="tjav">disponible '+pe(av)+'</span></span></div>'+
+      cuotaBox+
+      '<button class="tjpick none" data-tjchange="1" data-grp="'+g+'" data-idx="'+i+'"'+sj+'>⇄ '+tx('Cambiar de tarjeta','Change card')+'</button>'+
+      '<button class="tjpick none" data-tjpick="" data-grp="'+g+'" data-idx="'+i+'"'+sj+'>↺ '+tx('Quitar de tarjeta (volver a efectivo)','Remove from card (back to cash)')+'</button>'+
+      '<button class="tjdone-btn" data-tjdone="1" data-grp="'+g+'" data-idx="'+i+'"'+sj+'>✓ '+tx('Hecho','Done')+'</button>'+
+    '</div>';
+  }
+  return '<div class="tjpicker"'+idAttr+'>'+
     (rota?'<div class="tjpicker-h" style="color:var(--bad)">⚠ '+tx('Este cargo estaba en «'+esc(r.tjCard)+'», pero esa tarjeta ya no existe en tus Deudas. Elige otra tarjeta, o tócalo para volver a efectivo.','This charge was on "'+esc(r.tjCard)+'", but that card no longer exists in your Debts. Pick another card, or set it back to cash.')+'</div>':'')+
     '<div class="tjpicker-h">¿En qué tarjeta cargas <b>'+esc(r.l||'esto')+'</b>? La <b>recomendada</b> es la de más línea libre que aguanta el monto ('+pe(monto)+').</div>'+opts+
     (r.tj?'<button class="tjpick none" data-tjpick="" data-grp="'+g+'" data-idx="'+i+'"'+sj+'>↺ '+tx('Quitar de tarjeta (volver a efectivo)','Remove from card (back to cash)')+'</button>':'')+
@@ -2738,13 +2772,14 @@ app.addEventListener('click',e=>{
     const inp=app.querySelector('input.l[data-grp="'+g+'"][data-idx="'+newIdx+'"]:not([data-sub])');
     if(inp){inp.focus();inp.select();}
   }
-  else if(b.dataset.tjt){const g=b.dataset.grp,i=+b.dataset.idx,sub=b.dataset.sub;const k=sub!==undefined?g+'-'+i+'-'+sub:g+'-'+i;tjOpen=(tjOpen===k)?null:k;render();}
+  else if(b.dataset.tjt){const g=b.dataset.grp,i=+b.dataset.idx,sub=b.dataset.sub;const k=sub!==undefined?g+'-'+i+'-'+sub:g+'-'+i;tjOpen=(tjOpen===k)?null:k;tjPickAll=false;render();}
   else if(b.dataset.tjpick!==undefined){snapshot();const g=b.dataset.grp,i=+b.dataset.idx,card=b.dataset.tjpick;
     const tgt=(b.dataset.sub!==undefined)?d[g][i].sub[+b.dataset.sub]:d[g][i];
-    if(card){tgt.tj=true;tgt.tjCard=card;if(!tgt.tjCuotas)tgt.tjCuotas=1;/* selector queda abierto para fijar cuotas */}
-    else{tgt.tj=false;delete tgt.tjCard;delete tgt.tjCuotas;tjOpen=null;}
+    if(card){tgt.tj=true;tgt.tjCard=card;if(!tgt.tjCuotas)tgt.tjCuotas=1;tjPickAll=false;/* elegida → el picker colapsa a la vista de la elegida */}
+    else{tgt.tj=false;delete tgt.tjCard;delete tgt.tjCuotas;tjOpen=null;tjPickAll=false;}
     save();render();}
-  else if(b.dataset.tjdone){tjOpen=null;render();} // "Hecho": cierra el picker sin re-tocar la tarjetita
+  else if(b.dataset.tjchange){tjPickAll=true;render();} // "Cambiar de tarjeta": reabre la lista completa (acto deliberado)
+  else if(b.dataset.tjdone){tjOpen=null;tjPickAll=false;render();} // "Hecho": cierra el picker sin re-tocar la tarjetita
   else if(b.dataset.gostep!==undefined){wizGo(+b.dataset.gostep);}
   else if(b.dataset.focus!==undefined){focusGo(+b.dataset.focus);}
   else if(b.dataset.focustoggle){focusMode=!focusMode;focusStep=0;applyFocus();window.scrollTo({top:0,behavior:'smooth'});}
