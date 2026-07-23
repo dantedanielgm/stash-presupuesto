@@ -325,6 +325,12 @@ body.focuson .ov-bar{display:none}
 .dg-fold .dd-name{flex:1; min-width:0; font-size:15px; font-weight:600; color:var(--tx); cursor:pointer; padding:.55rem .2rem}
 .dg-fold .dg-total{width:78px; flex:none; text-align:right; font-size:15px; font-weight:700; color:var(--tx); font-variant-numeric:tabular-nums; padding:.55rem .2rem}
 .dg-fold .pchk-sp{width:22px; flex:none}
+/* Botón (i): explicación bajo demanda, chiquito y discreto — no compite con el contenido real */
+.info-i{flex:none; width:17px; height:17px; border-radius:50%; border:1.4px solid var(--tx3); background:transparent;
+  color:var(--tx3); font:italic 700 11px/1 Georgia,serif; cursor:pointer; padding:0; display:inline-flex;
+  align-items:center; justify-content:center; opacity:.75}
+.info-i:hover,.info-i:active{opacity:1; border-color:var(--accent); color:var(--accent)}
+.sec-h .info-i{margin-left:.4rem}
 /* Encabezado de grupo Préstamo / Tarjeta: nombre + subtotal + check-todos, alineado con las filas */
 .kind-row .kh-name{flex:1; min-width:0; margin:0}
 .kind-row .kh-total{width:78px; flex:none; text-align:right; font-size:13px; font-weight:700; color:var(--tx2); font-variant-numeric:tabular-nums; padding:.35rem .2rem}
@@ -878,6 +884,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 <div id="welcome" class="welcome" hidden>
   <div class="wel-card">
     <div class="wel-logo">Stash</div>
+    <div class="brand-sub" style="margin-top:-1.5rem; margin-bottom:1.4rem"><span class="bs-aho">20</span><i>/</i><span class="bs-nec">50</span><i>/</i><span class="bs-luj">30</span></div>
     <div class="wel-modes wel-langs">
       <button class="wel-mode on" data-wellang="es">Español</button>
       <button class="wel-mode" data-wellang="en">English</button>
@@ -914,6 +921,9 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 <div id="meta-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="meta-card"></div></div>
 <div id="settings-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="settings-card"></div></div>
 <div id="year-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="year-card"></div></div>
+<!-- Botones (i) puntuales: solo en los 2 conceptos que un recién llegado NO adivina por sí solo
+     (Deuda-dentro-de-Ahorro, Reserva). NO se puso en todo — sobre-explicar erosiona confianza. -->
+<div id="info-ovl" class="cierre-ovl" hidden><div class="cierre-card" id="info-card"></div></div>
 <input type="file" id="importfile" accept="application/json,.json" hidden>
 <button id="fab-gasto" class="fab-gasto" title="Anotar un gasto suelto">+ Gasto</button>
 <!-- 3 tabs = el balance general: Inicio (flujo del ciclo) · Deudas (pasivos) · Reserva (activos).
@@ -929,7 +939,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-20.13'; // nombre oficial "Stash 20/50/30": firma tricolor bajo el logo + ícono nuevo (3 velitas verde/azul/ámbar a escala 20-50-30 con sus números) + manifest corregido // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-20.14'; // firma tricolor también en el onboarding + botones (i) en "Deuda" y "Reserva" (explicación bajo demanda) + Deuda reordenada AL FINAL del sobre de Ahorro // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1552,7 +1562,7 @@ function fondoH(){
   // Estado de cuenta del CICLO: qué le pasó a la Reserva en este ciclo (aportes en vivo, cierre).
   let movs=[];try{movs=(JSON.parse(localStorage.getItem('midas_reslog'))||[]).filter(m=>m.q===activeQ);}catch(e){}
   const movSum=movs.reduce((t,m)=>t+(m.a||0),0);
-  return '<div class="sec-h"><span class="t">🔒 '+tx('Reserva','Reserve')+'</span></div>'+
+  return '<div class="sec-h"><span class="t">🔒 '+tx('Reserva','Reserve')+'</span><button class="info-i" data-info="reserva" title="'+tx('¿Qué es tu Reserva?','What is your Reserve?')+'">i</button></div>'+
     '<div class="fondo-tab">'+
       '<div class="ft-total"><span class="ft-l">'+tx('Tu Reserva','Your Reserve')+'<span class="ft-hint">'+tx('un apartado de tu dinero — parte de tus cuentas que no gastas este ciclo','money set aside — the part of your accounts you don\'t spend this cycle')+'</span></span><span class="ft-v">S/ <input id="fondo-inp" type="number" min="0" step="1" value="'+fondo+'"></span></div>'+
       (hasCuentas()?'<div class="ft-of">'+tx('de tus','of your')+' <b>'+pe(totalCuentas())+'</b> '+tx('en cuentas','in accounts')+(fondo>totalCuentas()+0.5?' — <span class="neg">'+tx('reservaste más de lo que tienes','you set aside more than you have')+'</span>':'')+'</div>':'')+
@@ -1655,6 +1665,28 @@ function openMetaModal(prefillName){
     seedMetaQuotas(d,cycleOf(activeQ));save(); // la cuota entra YA a la caja Ahorro de este ciclo
     ov.hidden=true;refreshFondo();render();
   });
+})();
+// ===== Botones (i) — explicación bajo demanda, SOLO donde un recién llegado no lo adivina solo
+// (pedido DD 20 jul, tras compartir la app y notar "Deuda" dentro de Ahorro sin contexto). Reutiliza
+// el mismo overlay/tarjeta que cierre/meta/gasto — cero CSS nuevo, misma familia visual.
+const INFO_TXT={
+  deuda:{h:'💳 '+tx('¿Por qué la Deuda vive en Ahorro?','Why does Debt live in Savings?'),
+    b:tx('Pagar una deuda TAMBIÉN es ahorro: cada pago reduce lo que debes — es plata que dejas de perder en intereses. Por eso sale del mismo sobre que tu Reserva e Inversión: los tres construyen tu patrimonio, cada uno a su manera.','Paying off debt IS a form of savings: every payment lowers what you owe — money you stop losing to interest. That\'s why it comes out of the same envelope as your Reserve and Investing: all three build your net worth, each in its own way.')},
+  reserva:{h:'🔒 '+tx('¿Qué es tu Reserva?','What is your Reserve?'),
+    b:tx('Es tu plata YA apartada — la parte de tus cuentas que decidiste no gastar. Vive en 3 pisos: <b>1) Colchón</b> tu red de emergencia (~3 meses de tus necesidades). <b>2) Metas</b> sueños con nombre y fecha. <b>3) Inversión</b> lo que ya empezaste a hacer crecer. Cada ✓ que marcas en Ahorro manda su plata aquí solo, sin que hagas nada más.','This is money you\'ve ALREADY set aside — the part of your accounts you decided not to spend. It lives on 3 floors: <b>1) Cushion</b> your emergency net (~3 months of your needs). <b>2) Goals</b> dreams with a name and date. <b>3) Investing</b> what you\'ve already started growing. Every ✓ you check in Savings sends its money here automatically — no extra step.')}
+};
+function openInfo(key){
+  const t=INFO_TXT[key]; if(!t)return;
+  const el=document.getElementById('info-card'); if(!el)return;
+  el.innerHTML='<div class="ci-h">'+t.h+'</div><div class="ci-sub" style="font-size:13px;line-height:1.55">'+t.b+'</div>'+
+    '<div class="ci-btns"><button class="ci-go" data-infoclose="1">'+tx('Entendido','Got it')+'</button></div>';
+  document.getElementById('info-ovl').hidden=false;
+}
+document.addEventListener('click',e=>{ // delegado global: el (i) puede vivir en CUALQUIER contenedor
+  const b=e.target.closest('[data-info]'); if(b){openInfo(b.dataset.info);return;}
+});
+(function(){const ov=document.getElementById('info-ovl');if(!ov)return;
+  ov.addEventListener('click',e=>{if(e.target===ov||e.target.closest('[data-infoclose]'))ov.hidden=true;});
 })();
 /* ===== Ceremonia de cierre (period-end close) — liquidación POR CAJA =====
    El cierre nunca adivina: (a) ahorro sin ✓ → pregunta "¿lo apartaste?" (sí → Reserva; no → caduca,
@@ -2318,8 +2350,11 @@ function bucketH(g,name,pct,num){
     // antes de los items). Solo en la vista desplegada.
     (col?'':'<div class="ln-red sec-out" id="red-'+g+'" style="display:none"></div>')+
     '<div class="bucket-body"'+(col?' style="display:none"':'')+'>'+
-      (g==='aho'?ahoDebtBlockH():'')+ // Deuda arriba → las categorías nuevas caen ABAJO (al final)
       rows+
+      // Deuda AL FINAL (reordenado 20 jul, pedido DD): Reserva/Inversión encabezan — son ahorro
+      // obvio a simple vista; Deuda cierra el sobre, con su (i) al lado para quien no entiende
+      // por qué una deuda vive aquí. Antes iba primero y era lo PRIMERO que veía un recién llegado.
+      (g==='aho'?ahoDebtBlockH():'')+
       '<button class="add" data-add="'+g+'"><span class="p">+</span> '+tx('Agregar categoría','Add category')+'</button>'+ // también en Ahorro
     '</div>'+
     wizBtn+'</div>';
@@ -3412,6 +3447,7 @@ function ahoDebtBlockH(){
     '<div class="row dg-fold" title="'+tx('Plegar/desplegar deudas','Collapse/expand debts')+'">'+
       '<button class="subtoggle" data-deudafold="1">'+(folded?'▸':'▾')+'</button>'+
       '<span class="l dd-name" data-deudafold="1">'+tx('Deuda','Debt')+'</span>'+
+      '<button class="info-i" data-info="deuda" title="'+tx('¿Por qué la Deuda vive en Ahorro?','Why does Debt live in Savings?')+'">i</button>'+
       '<span class="a dg-total">'+pe(planned)+'</span>'+
       '<button class="rm" data-deudaclear="1" aria-label="'+tx('Quitar deudas del ciclo','Remove debts from cycle')+'" title="'+tx('Quitar del ciclo las deudas elegidas','Remove the chosen debts from this cycle')+'">&times;</button>'+
       '<button class="pcheck pchk-paid'+(allDebtsPaid?' on':'')+'" data-deudaallpaid="1" title="'+tx('Marcar/desmarcar todas las deudas del ciclo','Check/uncheck every debt this cycle')+'">'+(allDebtsPaid?'✓':'')+'</button>'+
