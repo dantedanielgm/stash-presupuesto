@@ -232,11 +232,10 @@ body.focuson .reset{display:none}
 .hi-chev{font-size:15px; font-weight:400; color:var(--tx3); margin-left:.4rem; vertical-align:middle}
 .hi-manolbl{font:inherit; font-size:inherit; font-weight:inherit; color:inherit; background:transparent; border:none; padding:0; cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px}
 .hi-manolbl:hover{color:var(--accent)}
-.hi-tag{font:inherit; font-size:inherit; font-weight:inherit; color:inherit; background:transparent; border:none; padding:0; cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px}
-.hi-tag:hover{color:var(--accent)}
-/* Acordeón "en camino": lo pendiente, una fila por fuente, con su botón "✓ ya me pagó" */
+/* Acordeón "en camino": lo pendiente + lo ya llegado (grisado, con su ✓ para deshacer) */
 .hi-caminolist{margin:.5rem auto 0; max-width:340px; text-align:left; background:var(--line2); border-radius:10px; padding:.45rem .65rem}
 .hcl-row{display:flex; align-items:center; gap:.55rem; padding:.3rem 0; font-size:13px; color:var(--tx)}
+.hcl-row.hcl-done{opacity:.55}
 .hcl-n{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .hcl-a{font-weight:800; font-variant-numeric:tabular-nums}
 .hcl-go{font:inherit; font-size:11.5px; font-weight:800; color:#fff; background:var(--ok); border:none; border-radius:999px; padding:.28rem .6rem; cursor:pointer; white-space:nowrap}
@@ -244,18 +243,26 @@ body.focuson .reset{display:none}
 .hcl-empty{font-size:12px; color:var(--tx3); padding:.2rem 0}
 .hcl-all{display:block; width:100%; margin-top:.4rem; font:inherit; font-size:12px; font-weight:800; color:var(--ok); background:transparent; border:1.5px dashed var(--ok); border-radius:999px; padding:.35rem .6rem; cursor:pointer}
 .hcl-all:active{transform:scale(.97)}
-/* La realidad en el hero: en mano (editable) + en camino + chip contextual */
-.hi-mano{margin-top:.7rem; font-size:14px; font-weight:600; color:var(--tx2); display:inline-flex; align-items:center; gap:.15rem; flex-wrap:wrap; justify-content:center}
-.hi-mano input{width:88px; font:inherit; font-size:18px; font-weight:800; color:var(--tx); text-align:right; background:transparent; border:none; border-bottom:1.5px dashed var(--line); padding:0 2px}
-.hi-mano input:focus{outline:none; border-bottom-color:var(--accent)}
 .hi-manoval{font-size:18px; font-weight:800; color:var(--tx); font-variant-numeric:tabular-nums} /* futuro: lo destinado a ESE ciclo, solo lectura */
-.hi-camino{color:var(--accent); font-weight:700; font-variant-numeric:tabular-nums}
-.hi-chip{margin-top:.55rem}
-.hi-chip-btn{font:inherit; font-size:12.5px; font-weight:700; border:none; border-radius:999px; padding:.4rem .9rem; cursor:pointer; color:#fff}
-.hi-chip-btn.ok{background:var(--ok)}
-.hi-chip-btn:hover{filter:brightness(1.08)}
-.hi-chip-warn{font-size:11.5px; color:var(--bad); font-weight:600; background:var(--line2); border-radius:10px; padding:.4rem .7rem; line-height:1.4}
-.hi-chip-plan{font-size:11.5px; color:var(--accent); font-weight:600; background:var(--line2); border-radius:10px; padding:.4rem .7rem; line-height:1.4}
+/* 💰 "Mi plata" (rediseño 23 jul): Tengo-ahora + en-camino + Reserva agrupados, colapsado por defecto.
+   El resumen del header invita el toque cuando hay algo sin definir, sin forzar la apertura. */
+.miplata-card{margin-top:.8rem; border:1px solid var(--line); border-radius:12px; background:var(--card); overflow:hidden}
+.miplata-head{width:100%; display:flex; align-items:center; justify-content:center; gap:.3rem; background:transparent; border:none; font:inherit; font-size:13.5px; font-weight:700; color:var(--tx2); padding:.65rem .8rem; cursor:pointer; flex-wrap:wrap}
+.miplata-head:active{opacity:.75}
+.mp-pending{color:var(--accent); font-weight:800}
+.miplata-chev{font-size:11px; color:var(--tx3)}
+.miplata-body{padding:.15rem 1rem .9rem; border-top:1px solid var(--line2)}
+.mp-row{display:flex; align-items:center; justify-content:center; gap:.3rem; margin-top:.7rem; font-size:14px; font-weight:600; color:var(--tx2); flex-wrap:wrap}
+.mp-row input{width:88px; font:inherit; font-size:18px; font-weight:800; color:var(--tx); text-align:right; background:transparent; border:none; border-bottom:1.5px dashed var(--line); padding:0 2px}
+.mp-row input:focus{outline:none; border-bottom-color:var(--accent)}
+.mp-note{font-size:11.5px; color:var(--tx3); text-align:center; margin-top:.2rem; line-height:1.4}
+.mp-askbtns{display:flex; gap:.4rem; justify-content:center; margin-top:.55rem; flex-wrap:wrap}
+.mp-askbtn{font:inherit; font-size:12.5px; font-weight:700; border:1.5px solid var(--accent); color:var(--accent); background:transparent; border-radius:999px; padding:.4rem .8rem; cursor:pointer}
+.mp-askbtn:active{transform:scale(.96)}
+.mp-askbtn.warn{border-color:var(--tx3); color:var(--tx2)}
+.mp-link{width:100%; display:flex; align-items:center; justify-content:space-between; background:var(--line2); border:none; border-radius:9px; padding:.55rem .7rem; margin-top:.7rem; font:inherit; font-size:13px; font-weight:600; color:var(--tx); cursor:pointer; text-align:left}
+.mp-link.mp-dim{color:var(--tx2); font-weight:500}
+.mp-arrow{color:var(--tx3)}
 .ce-cerrar{width:100%; margin-top:.5rem; font:inherit; font-size:12.5px; font-weight:700; color:#fff; background:var(--accent); border:none; border-radius:9px; padding:.55rem; cursor:pointer}
 .hi-sub{font-size:12.5px; color:var(--tx2); margin-top:.45rem}
 .hi-sub b{color:var(--accent); font-weight:600}
@@ -941,7 +948,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-23.1'; // "por definir" hasta que TÚ digas si la plata ya está en mano o viene en camino (la app no presume) + botones (i) en "Tengo ahora" y en el tag 📥 + guía dentro del acordeón // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-23.2'; // rediseño "💰 Mi plata": Tengo-ahora + en-camino + Reserva agrupados bajo un chevron, colapsado por defecto; lo indefinido se resuelve con 3 botones humanos (Ya la tengo/Aún no llega/Una parte); acordeón permite deshacer llegadas ya marcadas; borrar la única fuente re-siembra un default // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1243,6 +1250,11 @@ let lastSaldo=0; // último saldo libre calculado (para congelar el rollover)
 let collapsed={aho:true,nec:true,luj:true,balance:true}; // al abrir: 3 cajas + balance colapsados
 let incEdit=false; // editar/agregar ingreso (oculto por defecto; el ingreso se ve grande arriba)
 let caminoOpen=false; // acordeón de "en camino": lista SOLO lo pendiente, con "✓ ya me pagó" por fuente
+// "Mi plata" (rediseño 23 jul, pedido DD): Tengo-ahora + en-camino + Reserva viven agrupados bajo UN
+// chevron — colapsado por defecto SIEMPRE (DD: "que se muestren solo al darle al chevron"). El resumen
+// del header cambia de color/texto cuando hay algo sin definir, invitando el toque sin forzar nada.
+let miPlataOpen=false;
+function caminoEstaDefinido(){return !!(d.caminoDef||(d.incGot&&Object.keys(d.incGot).length)||Object.keys(d.itemPaid||{}).some(k=>k.indexOf('inc-')===0));}
 let view='inicio'; // tab activo: inicio (las 3 cajas) | plan | deudas | informe
 // Modo enfocado (wizard): una sola caja a la vez. Arranca APAGADO → se ve el overview de las 3 cajas.
 let focusMode=false, focusStep=0, lastOver=0;
@@ -1675,9 +1687,9 @@ const INFO_TXT={
   deuda:{h:'💳 '+tx('¿Por qué la Deuda vive en Ahorro?','Why does Debt live in Savings?'),
     b:tx('Pagar una deuda TAMBIÉN es ahorro: cada pago reduce lo que debes — es plata que dejas de perder en intereses. Por eso sale del mismo sobre que tu Reserva e Inversión: los tres construyen tu patrimonio, cada uno a su manera.','Paying off debt IS a form of savings: every payment lowers what you owe — money you stop losing to interest. That\'s why it comes out of the same envelope as your Reserve and Investing: all three build your net worth, each in its own way.')},
   tengoahora:{h:'💰 '+tx('¿Qué es «Tengo ahora»?','What is "On hand"?'),
-    b:tx('Tu plata REAL en este momento — efectivo + cuentas, tipeada por ti. Es el número contra el que todo se compara. Se mueve solo: <b>baja</b> con cada gasto que marcas ✓ y <b>sube</b> cuando marcas que un ingreso te llegó. Si algún día no cuadra con tu banco, re-tipéalo: tu número real siempre manda.','Your ACTUAL money right now — cash + accounts, typed by you. It\'s the number everything compares against. It moves by itself: it <b>drops</b> with every expense you check ✓ and <b>rises</b> when you mark that income arrived. If it ever drifts from your bank, just re-type it: your real number always wins.')},
+    b:tx('Tu plata REAL — efectivo + cuentas, tipeada por ti. No hay una respuesta única: si te gusta el detalle, pon tu saldo TOTAL del banco (todo queda registrado); si prefieres simple, pon solo lo que vas a usar este ciclo (ej. tu sueldo). Lo que no metas aquí, Stash no lo toca ni lo reclama — no hay que reconciliarlo todo. El número se mueve solo: <b>baja</b> con cada gasto ✓, <b>sube</b> cuando marcas un ingreso recibido. En un ciclo futuro se ve en solo lectura (🔒) porque pertenece al ciclo presente — ahí es donde se edita.','Your REAL money — cash + accounts, typed by you. There\'s no single right answer: if you like detail, type your bank\'s FULL balance (everything gets tracked); if you prefer simple, type only what you\'ll use this cycle (e.g. your paycheck). Whatever you don\'t enter here, Stash doesn\'t touch or claim — nothing forces full reconciliation. The number moves by itself: it <b>drops</b> with every ✓ expense, <b>rises</b> when you mark income received. In a future cycle it shows read-only (🔒) because it belongs to the present cycle — that\'s where you edit it.')},
   camino:{h:'📥 '+tx('¿Qué es esta plata?','What is this money?'),
-    b:tx('Son tus fuentes de ingreso de este ciclo que AÚN no marcaste como recibidas. Stash no sabe si esa plata ya está en tu mano o está por llegarte — <b>tú lo defines</b>: toca el chevron ▾ y, si ya la tienes, marca «✓ ya me pagó» (pasa a Tengo ahora); si aún no llega, déjala — quedará «en camino» y la marcas el día que caiga. Si llegó un monto distinto, usa ½ o «Llegó todo — ajustar al real».','These are this cycle\'s income sources you haven\'t marked as received yet. Stash doesn\'t know whether that money is already in your hand or on its way — <b>you define it</b>: tap the chevron ▾ and, if you already have it, hit "✓ got paid" (it moves into On hand); if it hasn\'t arrived, leave it — it stays "incoming" until the day it lands. If a different amount arrived, use ½ or "All arrived — adjust to actual".')},
+    b:tx('Son tus fuentes de ingreso de este ciclo que AÚN no marcaste como recibidas. Stash no sabe si ya la tienes o está por llegarte — <b>tú lo decides</b> con 3 botones: «Ya la tengo» (entra completa a Tengo ahora), «Aún no llega» (queda «en camino», la marcas cuando caiga) o «Una parte» (abre cada fuente para marcar de a una, con ½ si llegó un monto distinto).','These are this cycle\'s income sources you haven\'t marked as received yet. Stash doesn\'t know whether you already have it or it\'s on its way — <b>you decide</b> with 3 buttons: "I have it" (goes fully into On hand), "Not yet" (stays "incoming", mark it when it lands) or "Some of it" (opens each source to mark one by one, with ½ if a different amount arrived).')},
   reserva:{h:'🔒 '+tx('¿Qué es tu Reserva?','What is your Reserve?'),
     b:tx('Es tu plata YA apartada — la parte de tus cuentas que decidiste no gastar. Vive en 3 pisos: <b>1) Colchón</b> tu red de emergencia (~3 meses de tus necesidades). <b>2) Metas</b> sueños con nombre y fecha. <b>3) Inversión</b> lo que ya empezaste a hacer crecer. Cada ✓ que marcas en Ahorro manda su plata aquí solo, sin que hagas nada más.','This is money you\'ve ALREADY set aside — the part of your accounts you decided not to spend. It lives on 3 floors: <b>1) Cushion</b> your emergency net (~3 months of your needs). <b>2) Goals</b> dreams with a name and date. <b>3) Investing</b> what you\'ve already started growing. Every ✓ you check in Savings sends its money here automatically — no extra step.')}
 };
@@ -2370,6 +2382,80 @@ function syncParents(){
   buckets.forEach(b=>{d[b[0]].forEach(r=>{if(hasSubs(r))r.a=sum(r.sub);});});
 }
 
+// "Mi plata": Tengo-ahora + en-camino + Reserva, agrupados bajo un solo chevron (rediseño 23 jul).
+// Colapsado SIEMPRE por defecto; el resumen del header invita el toque cuando hay algo sin definir —
+// nunca fuerza la apertura. Dentro, lo indefinido se resuelve con 3 botones humanos, no una etiqueta
+// críptica: "¿Ya la tengo, aún no llega, o una parte?" — la app pregunta, no presume ni calla.
+function miPlataH(caminoRows,manoFut,metible,yaMetido,yaDentro){
+  if(d.closed)return '';
+  const porLlegar=caminoRows.reduce((t,x)=>t+(parseFloat(x.r.a)||0),0);
+  const definido=caminoEstaDefinido();
+  const pendiente=porLlegar>0.5&&!definido;
+  let resumen;
+  if(pendiente)resumen='<span class="mp-pending">S/ '+pn(porLlegar)+' '+tx('por definir','to define')+'</span>';
+  else if(manoFut)resumen=pe(yaDentro);
+  else if(!hasCuentas())resumen=tx('toca para configurar','tap to set up');
+  else resumen=pe(saldoVivo())+(porLlegar>0.5?' · '+pe(porLlegar)+' '+tx('en camino','incoming'):'');
+  let h='<div class="miplata-card" id="miplata-card">'+
+    '<button class="miplata-head" data-miplatatoggle="1">💰 '+tx('Mi plata','My money')+' · '+resumen+' <span class="miplata-chev">'+(miPlataOpen?'▲':'▾')+'</span></button>';
+  if(miPlataOpen){
+    h+='<div class="miplata-body">';
+    // Fila "Tengo ahora" — el nombre NO cambia en futuro (DD 23 jul: "Para este ciclo" confundía);
+    // en su lugar, un 🔒 + nota explican por qué está en solo-lectura ahí.
+    h+='<div class="mp-row">'+
+      ((hasCuentas()&&metible>0.5&&!d.closed&&!manoFut)
+        ?'<button class="hi-manolbl" data-metermano="1">💰 '+tx('Tengo ahora','On hand')+'</button>'
+        :(hasCuentas()&&yaMetido
+          ?'<button class="hi-manolbl" data-manoinfo="1">💰 '+tx('Tengo ahora','On hand')+'</button>'
+          :'💰 '+tx('Tengo ahora','On hand')))+
+      (manoFut?' 🔒':'')+
+      '<button class="info-i" data-info="tengoahora">i</button>'+
+      (manoFut
+        ?' S/ <b class="hi-manoval">'+pn(yaDentro)+'</b>'
+        :' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0">')+
+    '</div>'+
+    '<div class="mp-note">'+(manoFut
+      ?tx('lo que ya destinaste para este ciclo — se edita desde el ciclo presente','what you already set for this cycle — edit it from the present cycle')
+      :tx('efectivo + cuentas — puedes poner tu saldo total o solo lo de este ciclo','cash + accounts — put your full balance or just this cycle\'s share'))+'</div>';
+    // Fila "en camino" / pregunta activa. OJO (bug cazado en verificación 23 jul): el acordeón NO puede
+    // depender de "hay pendientes" — si dependiera, marcar la ÚLTIMA fuente pendiente lo hace desaparecer
+    // de golpe junto con el único camino para DESHACERLA. El chevron/acordeón vive independiente de
+    // cuántas queden pendientes; solo el texto de la fila superior cambia según el caso.
+    const llegadasRows=(d.inc||[]).map((r2,i2)=>({r:r2,i:i2})).filter(x=>!!(d.itemPaid&&d.itemPaid['inc-'+x.i]));
+    if(pendiente){
+      h+='<div class="mp-row">📥 S/ '+pn(porLlegar)+' <button class="info-i" data-info="camino">i</button></div>'+
+        '<div class="mp-note">'+tx('¿Ya tienes esta plata, o está por llegarte?','Do you already have this money, or is it on its way?')+'</div>'+
+        '<div class="mp-askbtns">'+
+          '<button class="mp-askbtn" data-mpask="tengo">'+tx('Ya la tengo','I have it')+'</button>'+
+          '<button class="mp-askbtn warn" data-mpask="noaun">'+tx('Aún no llega','Not yet')+'</button>'+
+          '<button class="mp-askbtn warn" data-mpask="parte">'+tx('Una parte','Some of it')+'</button>'+
+        '</div>';
+    } else if(caminoRows.length){
+      h+='<div class="mp-row"><button class="hi-manolbl" data-openfuentes="1">📥 '+tx('en camino','incoming')+' S/ '+pn(porLlegar)+' '+(caminoOpen?'▲':'▾')+'</button><button class="info-i" data-info="camino">i</button></div>';
+    } else if(llegadasRows.length){
+      // Nada pendiente, pero SÍ hay llegadas marcadas: el chevron sigue vivo para poder deshacerlas.
+      h+='<div class="mp-row"><button class="hi-manolbl" data-openfuentes="1" style="color:var(--ok)">✓ '+tx('Todo tu ingreso ya llegó','All your income has arrived')+' '+(caminoOpen?'▲':'▾')+'</button></div>';
+    }
+    if((caminoRows.length||llegadasRows.length)&&(caminoOpen||pendiente)){
+      // El acordeón lista lo pendiente Y lo ya llegado (grisado, con su ✓ para DESHACER — DD 23 jul:
+      // "no había forma de anularlo" una vez marcado. Antes solo se veía lo pendiente).
+      h+='<div class="hi-caminolist">'+
+        caminoRows.map(x=>'<div class="hcl-row"><span class="hcl-n">'+esc(x.r.l||tx('Fuente','Source'))+'</span><span class="hcl-a">S/ '+pn(parseFloat(x.r.a)||0)+'</span><button class="hcl-part" data-incpart="'+x.i+'" title="'+tx('Me llegó otro monto (menos o más)','A different amount arrived (less or more)')+'">½</button><button class="hcl-go" data-itempaid="inc-'+x.i+'">✓ '+tx('ya me pagó','got paid')+'</button></div>').join('')+
+        (caminoRows.length?'<button class="hcl-all" data-caminoall="1">✓ '+tx('Llegó todo — ajustar al monto real','All arrived — adjust to actual')+'</button>':'')+
+        llegadasRows.map(x=>'<div class="hcl-row hcl-done"><span class="hcl-n">'+esc(x.r.l||tx('Fuente','Source'))+'</span><span class="hcl-a">S/ '+pn(parseFloat(x.r.a)||0)+'</span><button class="pcheck pchk-paid on" data-itempaid="inc-'+x.i+'" title="'+tx('Ya llegó — toca para deshacer','Already arrived — tap to undo')+'">✓</button></div>').join('')+
+      '</div>';
+    }
+    // Fila Reserva — de una vez el lugar para "¿tienes plata ya guardada aparte?" (DD 23 jul, caso del
+    // usuario con plata en el banco antes de presupuestar). Un solo dato, un solo lugar (la pestaña).
+    h+=(fondo>0.5
+      ?'<button class="mp-link" data-goview="fondo">🔒 '+tx('Reserva','Reserve')+' <b>'+pe(fondo)+'</b><span class="mp-arrow">→</span></button>'
+      :'<button class="mp-link mp-dim" data-goview="fondo">🔒 '+tx('¿Ya tienes plata guardada aparte de esto?','Already have money set aside apart from this?')+'<span class="mp-arrow">→</span></button>');
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
+}
+
 function render(){
   syncParents();
   document.getElementById('month').value=d.month||'';
@@ -2414,46 +2500,9 @@ function render(){
         // El número grande ES el botón: tocarlo despliega el desglose de fuentes ahí mismo (sin pantallita aparte)
         '<div class="hi-num" id="hi-num" data-incedit="1" role="button" title="'+tx('Toca para ver y editar tus fuentes','Tap to view and edit your sources')+'"><span id="hi-num-v">—</span><span class="hi-chev">'+(incEdit?'▲':'▾')+'</span></div>'+
         '<div class="hi-sub"><b id="hi-cycle"></b></div>'+
-        // La REALIDAD: tu plata real (editable) + en camino + Reserva. En todos los ciclos VIVOS igual
-        // (pedido de DD 13 jul: "en camino 4200 y en cuanto vaya recibiendo marcar tanto — que todos
-        // los ciclos se comporten igual"; su sueldo de un ciclo llega ANTES de que el ciclo arranque).
-        // Único candado en futuros: METER plata en mano — eso sí reclamaría la misma plata en dos planes.
-        // En un ciclo CERRADO la línea entera desaparece (DD 13 jul: es historial — el banner del
-        // cierre ya cuenta el resultado; "tengo ahora / en camino" ahí solo confunden).
-        (d.closed?'':
-        ('<div class="hi-mano" title="'+(manoFut
-            ?tx('Lo que ya llegó o destinaste PARA este ciclo. Tu plata real vive en el ciclo en curso; al cerrar, su sobrante pasa aquí o a tu Reserva.','What already arrived or was set for THIS cycle. Your actual money lives in the current cycle; when you close it, the surplus flows here or to your Reserve.')
-            :tx('Tu plata real en este momento — efectivo + cuentas. Marca lo que va llegando y «en camino» baja solo.','Your actual money right now — cash + accounts. Check what arrives and "incoming" goes down by itself.'))+'">'+
-          // "Tengo ahora" ES el botón (pedido de DD): con plata sin destino, tocarlo la destina a este
-          // ciclo; ya destinada, tocarlo ABRE el desglose para VER que está dentro (pedido de DD 13 jul:
-          // "no hay forma de abrirlo y ver que ya está asignada"). Solo es texto plano sin cuentas.
-          // En ciclo FUTURO la etiqueta es "Para este ciclo" y el valor es lo destinado a ÉL, desde 0
-          // (decisión de DD 13 jul: "lo que tengo ya tiene destino y es el ciclo actual, no el próximo").
-          ((hasCuentas()&&metible>0.5&&!d.closed&&!manoFut)
-            ?'<button class="hi-manolbl" data-metermano="1" title="'+tx('Toca para destinar esta plata a ESTE ciclo','Tap to send this money into THIS cycle')+'">💰 '+tx('Tengo ahora','On hand')+'</button>'
-            :(hasCuentas()&&yaMetido
-              ?'<button class="hi-manolbl" data-manoinfo="1" title="'+tx('Tu plata ya está destinada a este ciclo — toca para ver el desglose','Your money is already inside this cycle — tap to see the breakdown')+'">💰 '+(manoFut?tx('Para este ciclo','For this cycle'):tx('Tengo ahora','On hand'))+'</button>'
-              :'💰 '+(manoFut?tx('Para este ciclo','For this cycle'):tx('Tengo ahora','On hand'))))+
-          // (i) de "Tengo ahora": pedido DD 23 jul — "es clave que se entienda qué hacen las cosas"
-          (manoFut?'':'<button class="info-i" data-info="tengoahora">i</button>')+
-          (manoFut
-            ?' S/ <b class="hi-manoval">'+pn(yaDentro)+'</b>'
-            :' S/ <input id="banco-total-inp" type="number" min="0" step="1" value="'+(bancoTotal===''?'':Math.round(saldoVivo()))+'" placeholder="0">')+
-          '<span class="hi-camino" id="hi-camino"></span></div>'+
-        // Acordeón "en camino": SOLO lo pendiente, una fila por fuente/compañía con su "✓ ya me pagó".
-        // Marcar = esa plata pasa a "Tengo ahora" y en camino queda el resto.
-        (caminoOpen
-          ?'<div class="hi-caminolist">'+(caminoRows.length
-            // Guía SOLO mientras nada está definido (DD 23 jul): el usuario decide si esa plata ya
-            // está en su mano (✓) o viene en camino (dejarla) — la app no presume.
-            ?((d.caminoDef||(d.incGot&&Object.keys(d.incGot).length))?'':'<div class="hcl-empty" style="padding-bottom:.35rem">'+tx('¿Esta plata YA está en tu mano? Márcala ✓. ¿Aún no llega? Déjala — queda «en camino» y la marcas cuando caiga.','Already have this money? Check it ✓. Not here yet? Leave it — it stays "incoming" until it lands.')+'</div>')
-            +caminoRows.map(x=>'<div class="hcl-row"><span class="hcl-n">'+esc(x.r.l||tx('Fuente','Source'))+'</span><span class="hcl-a">S/ '+pn(parseFloat(x.r.a)||0)+'</span><button class="hcl-part" data-incpart="'+x.i+'" title="'+tx('Me llegó otro monto (menos o más)','A different amount arrived (less or more)')+'">½</button><button class="hcl-go" data-itempaid="inc-'+x.i+'">✓ '+tx('ya me pagó','got paid')+'</button></div>').join('')
-              // "Llegó todo": un solo toque marca TODAS las pendientes; si el total real fue otro
-              // (te pagaron más o menos), el presupuesto del ciclo se ajusta a lo que DE VERDAD llegó.
-              +'<button class="hcl-all" data-caminoall="1">✓ '+tx('Llegó todo — ajustar al monto real','All arrived — adjust to actual')+'</button>'
-            :'<div class="hcl-empty">'+tx('Nada en camino — todo lo esperado ya llegó.','Nothing incoming — everything expected already arrived.')+'</div>')+'</div>'
-          :'')))+
-        '<div id="banco-cta" class="hi-chip"></div>'+
+        // "Mi plata" (rediseño 23 jul): Tengo-ahora + en-camino + Reserva agrupados bajo un chevron,
+        // colapsado por defecto. Ver miPlataH() — construida antes de render() con la lógica completa.
+        miPlataH(caminoRows,manoFut,metible,yaMetido,yaDentro)+
       '</div>'+
       // Desglose de FUENTES: se abre tocando el número grande. ("Me pagan el" vive en el ✎ del ciclo.)
       '<div id="inc-detail"'+(incEdit?'':' style="display:none"')+'>'+
@@ -2648,33 +2697,11 @@ function recompute(){
   const fn=document.getElementById('fondo-note');
   if(fn){ const real=(typeof ejecutadoSum==='function')?ejecutadoSum():0; const aRes=ti-real;
     fn.innerHTML='Al cerrar: gastaste <b>'+pe(real)+'</b> de verdad (lo marcado ✓). Lo no usado (<b>'+pe(aRes)+'</b>) lo mandas a tu <b>Reserva</b> o al siguiente ciclo — eliges al cerrar'+(aRes<-0.5?' <span style="color:var(--bad)">(gastaste más que tu ingreso — tu Reserva puede cubrirlo)</span>':'')+'.'; }
-  // Realidad en el hero: el input "En mano" (contador vivo) + "en camino" + el chip contextual.
-  // El número ya subió/bajó con cada ✓ (cashDelta); acá solo se refleja. El chip aparece SOLO cuando
-  // hay noticia (plata sin trabajo o una fuga) — cero ruido cuando todo cuadra (management by exception).
+  // Realidad en el hero: el input "Tengo ahora" (contador vivo) dentro de "Mi plata". Solo se patchea
+  // el valor del input aquí (sin perder el foco mientras tipeas); el resto de "Mi plata" (resumen,
+  // en-camino, Reserva) se reconstruye completo en cada render() vía miPlataH() — no cambia con cada
+  // tecla, así que no necesita parche en vivo aquí.
   {const bti=document.getElementById('banco-total-inp'); if(bti&&document.activeElement!==bti)bti.value=(bancoTotal===''?'':Math.round(saldoVivo()));}
-  {const cam=document.getElementById('hi-camino'), bc=document.getElementById('banco-cta'); const bx=bancoExtra();
-   const fut=isFutureActive();
-    // El desglose de tu realidad en una línea — cada pieza es TOCABLE y explica de dónde nace:
-    // "en camino" = tus fuentes aún sin ✓. Chevron ▾/▲ = acordeón: toca y las fuentes se abren
-    // ahí abajo, con su monto y su check (pedido literal de DD).
-    // "POR DEFINIR" hasta que el usuario diga algo (cazado por DD 23 jul en incógnito): la app NO
-    // sabe si esa plata ya está en la mano o viene en camino — afirmarlo era presumir. Se vuelve
-    // "en camino" recién cuando el usuario define algo (marca un ✓/½/llegó-todo → d.caminoDef).
-    const caminoDefinido=!!(d.caminoDef||(d.incGot&&Object.keys(d.incGot).length)||Object.keys(d.itemPaid||{}).some(k=>k.indexOf('inc-')===0));
-    if(cam)cam.innerHTML=((bx&&bx.porLlegar>0.5)?' · <button class="hi-tag" data-openfuentes="1" title="'+(caminoDefinido
-        ?tx('Plata que esperas y aún no llega. Toca el chevron: verás cada fuente pendiente con su «✓ ya me pagó».','Money you expect that hasn\'t arrived. Tap the chevron: each pending source with its "✓ got paid".')
-        :tx('Stash aún no sabe si esta plata ya está en tu mano o está por llegarte. Toca el chevron y defínelo.','Stash doesn\'t know yet whether this money is already in your hand or on its way. Tap the chevron and define it.'))+'">📥 '
-      +(caminoDefinido?tx('en camino','incoming')+' S/ '+pn(bx.porLlegar):'S/ '+pn(bx.porLlegar)+' '+tx('por definir','to define'))
-      +' '+(caminoOpen?'▲':'▾')+'</button><button class="info-i" data-info="camino">i</button>':'')+
-      ((typeof fondo==='number'&&fondo>0.5)?' · <button class="hi-tag" data-goview="fondo" title="'+tx('Tu plata apartada. Toca para ir a la Reserva.','Your money set aside. Tap to open the Reserve.')+'">🔒 '+tx('Reserva','Reserve')+' '+pn(fondo)+'</button>':'');
-    if(bc){
-      // ☠️ Los chips ✨/⚠ (juicio plan-vs-realidad de bancoExtra) MURIERON (13 jul, orden directa de DD,
-      // 3ª vez que la burbuja lo confunde: 318 fantasma tras re-tipear su plata). Su modelo: re-tipear
-      // "Tengo ahora" ES el nuevo punto de verdad; la única plata "sin trabajo" es la de Tengo ahora
-      // aún sin meter (subrayado metermano) y lo no asignado vive en "Por asignar" del macro. NO REVIVIRLOS.
-      // (El chip 🔮 de ciclo futuro también murió: la línea de realidad ahora vive en TODOS los ciclos.)
-      bc.innerHTML='';
-    }}
   // Reparto 50/30/20: el chip "↻ 50/30/20" bajo Disponible enciende/apaga esto (showRollover).
   // Reparte el saldo libre ACTUAL en la columna "Repartido" de cada caja. Es la ÚNICA acción sobre
   // lo disponible — en envelope budgeting, disponible solo se asigna a los sobres. La deuda vive en
@@ -2847,6 +2874,16 @@ app.addEventListener('click',e=>{
   else if(b.dataset.paid!==undefined){toggleDebtPaid(b.dataset.paid);}
   else if(b.dataset.goview){view=b.dataset.goview;applyView();window.scrollTo({top:0,behavior:'smooth'});}
   else if(b.dataset.openfuentes){caminoOpen=!caminoOpen;render();} // chevron de "en camino": abre/cierra la lista de pendientes ahí mismo
+  else if(b.dataset.miplatatoggle){miPlataOpen=!miPlataOpen;render();} // "💰 Mi plata": abre/cierra TODA la tarjeta (Tengo ahora + en camino + Reserva)
+  else if(b.dataset.mpask==='tengo'){ // "Ya la tengo": TODAS las pendientes se marcan con su monto esperado, sin preguntar de a una
+    snapshot(); if(!d.itemPaid)d.itemPaid={}; if(!d.incGot)d.incGot={};
+    if(!hasCuentas())bancoTotal='0'; // decir "ya la tengo" es decidir empezar a trackear tu plata real
+    let total=0;
+    (d.inc||[]).forEach((r,i)=>{ if(!d.itemPaid['inc-'+i]){ const amt=parseFloat(r.a)||0; if(amt>0.5){d.itemPaid['inc-'+i]=true;d.incGot['inc-'+i]=amt;total+=amt;} } });
+    if(total>0.5){bancoTotal=(parseFloat(bancoTotal)||0)+total;saveBancoTotal();}
+    d.caminoDef=true; save(); render();}
+  else if(b.dataset.mpask==='noaun'){snapshot(); d.caminoDef=true; save(); render();} // "Aún no llega": no mueve plata, solo confirma que sigues esperando
+  else if(b.dataset.mpask==='parte'){snapshot(); d.caminoDef=true; caminoOpen=true; save(); render();} // "Una parte": abre el desglose por fuente (½ / ✓ una por una)
   else if(b.dataset.incedit){incEdit=!incEdit;render();}
   else if(b.dataset.collapse!==undefined){collapsed[b.dataset.collapse]=!collapsed[b.dataset.collapse];render();}
   else if(b.dataset.collapseall){const anyOpen=Object.values(collapsed).some(v=>!v);['aho','nec','luj'].forEach(g=>collapsed[g]=anyOpen);render();}
@@ -3028,6 +3065,10 @@ app.addEventListener('click',e=>{
       cashDelta(()=>{
         shiftPaidKeys(g,i,null); // corre las llaves para que el estado de pago siga a la categoría correcta
         d[g].splice(i,1);
+        // Borraste tu ÚNICA fuente de ingreso: el hero quedaba en S/0 sin ningún "+ Agregar fuente"
+        // visible por default (bug cazado por DD 23 jul: "no aparece ni sueldo ni salario"). Re-siembra
+        // una fila neutra — el usuario nunca ve un presupuesto vacío sin salida.
+        if(g==='inc'&&d.inc.length===0)d.inc.push({l:tx('Sueldo / quincena','Paycheck'),a:0});
       });
       save();render();
     }
