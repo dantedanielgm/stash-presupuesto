@@ -264,6 +264,9 @@ body.focuson .reset{display:none}
 .mp-link.mp-dim{color:var(--tx2); font-weight:500}
 .mp-arrow{color:var(--tx3)}
 .ce-cerrar{width:100%; margin-top:.5rem; font:inherit; font-size:12.5px; font-weight:700; color:#fff; background:var(--accent); border:none; border-radius:9px; padding:.55rem; cursor:pointer}
+/* Borrar ciclo: rojo tenue con borde — destructivo pero secundario (el confirm es el guardián) */
+.ce-del{width:100%; margin-top:.4rem; font:inherit; font-size:12px; font-weight:700; color:var(--bad); background:transparent; border:1.5px solid var(--bad); border-radius:9px; padding:.5rem; cursor:pointer; opacity:.85}
+.ce-del:hover,.ce-del:active{opacity:1; background:var(--bad-bg)}
 .hi-sub{font-size:12.5px; color:var(--tx2); margin-top:.45rem}
 .hi-sub b{color:var(--accent); font-weight:600}
 .hi-phrase{font-size:11.5px; color:var(--tx3); margin-top:.3rem; font-style:italic}
@@ -956,7 +959,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-23.5'; // regla de meses: "+" solo en meses VACÍOS y con 2 opciones — Mes entero o Quincenas (crea Q1+Q2 juntas); nunca quincenas sueltas ni ciclos encima de lo que ya hay // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-23.6'; // 🗑 Borrar ciclo (en el ✎): devuelve la plata que movió (llegadas, pagos de deuda, apartados) y salta al presente; bloqueado en cerrados y si es el único // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1242,8 +1245,54 @@ function cycEditH(c){
     (c.id===activeQ?'<div class="ce-dates"><label class="ce-l">'+tx('Me pagan el','I get paid on')+'<input type="date" data-cycpayday="1" value="'+(d.payday||'')+'"></label></div>':'')+
     // Cerrar el ciclo vive acá (operación DEL ciclo). El caso normal ya lo trae el banner automático al vencer.
     (c.id===activeQ?'<button class="ce-cerrar" data-cerrar="1">'+(d.closed?tx('✅ Ciclo cerrado — reabrir/revisar','✅ Cycle closed — reopen/review'):tx('Cerrar este ciclo y pasar al siguiente →','Close this cycle and move to the next →'))+'</button>':'')+
+    // Borrar el ciclo (DD 23 jul: "creé una quincena y no sabía cómo quitarla"). Solo el activo,
+    // solo si NO está cerrado (lo cerrado es historial) y si no es el único. Devuelve la plata que
+    // este ciclo haya movido (llegadas, pagos de deuda, apartados) antes de morir.
+    (c.id===activeQ&&!d.closed&&cycles.length>1?'<button class="ce-del" data-cycdel="1">🗑 '+tx('Borrar este ciclo','Delete this cycle')+'</button>':'')+
     '<button class="ce-done" data-cyceditdone="1">'+tx('Listo','Done')+'</button>'+
   '</div>';
+}
+// Borra el ciclo ACTIVO devolviendo primero todo lo que movió: llegadas de ingreso (salen del
+// contador), pagos de deuda asentados (el saldo real vuelve), apartados a Reserva (vuelven).
+// "Me equivoqué al crear esto" no puede costar plata — la misma regla del ✗ de ítems.
+function borrarCicloActivo(){
+  if(d.closed||cycles.length<2)return;
+  const tieneData=sum(d.inc||[])>0.5||Object.keys(d.itemPaid||{}).length>0||Object.keys(d.paid||{}).length>0;
+  const msg=tieneData
+    ?tx('Este ciclo tiene datos (fuentes, montos o ✓ marcados). ¿Borrarlo por completo? La plata que movió se devuelve, pero sus registros se pierden.','This cycle has data (sources, amounts or checked ✓). Delete it entirely? Money it moved gets returned, but its records are lost.')
+    :tx('¿Borrar este ciclo?','Delete this cycle?');
+  if(!confirm(msg))return;
+  snapshot();
+  // 0) TODO lo que los ✓ de este ciclo restaron del contador (gastos, pagos de deuda, ahorros —
+  //    cashDelta lo fue descontando) VUELVE: si el ciclo nunca pasó, su plata gastada tampoco.
+  //    (Cazado en verificación: sin esto, borrar un ciclo con un pago de 377 dejaba el banco 377 abajo.)
+  const ejec=(typeof ejecutadoSum==='function')?ejecutadoSum():0;
+  if(ejec>0.5&&hasCuentas()){bancoTotal=(parseFloat(bancoTotal)||0)+ejec;}
+  // 1) pagos de deuda asentados → el saldo real de cada deuda vuelve exacto
+  Object.keys(d.paid||{}).forEach(n=>revertPaidDelta(n));
+  // 2) llegadas de ingreso → salen del contador global
+  Object.keys(d.incGot||{}).forEach(k=>{const amt=parseFloat(d.incGot[k])||0;
+    if(amt>0.5&&hasCuentas()){bancoTotal=(parseFloat(bancoTotal)||0)-amt;}});
+  saveBancoTotal();
+  // 3) apartados que viajaron a la Reserva → vuelven (y las barras de metas retroceden)
+  Object.keys(d.ahoMoved||{}).forEach(k=>{const amt=parseFloat(d.ahoMoved[k])||0;
+    if(amt>0.5){fondo-=amt;undoResLog(amt,ahoKeyLabel(k));
+      const meta=(typeof metaFor==='function')?metaFor(((d.aho[+k.split('-')[1]]||{}).l)||''):null;
+      if(meta){meta.a=Math.max((parseFloat(meta.a)||0)-amt,0);saveFondoCats();}}});
+  saveFondo();
+  // 4) el ciclo muere: su data, su entrada en la barra, y saltamos al presente (o al vecino)
+  const deadId=activeQ;
+  localStorage.removeItem(keyFor(deadId));
+  const k=cycles.findIndex(c=>c.id===deadId);
+  cycles.splice(k,1);saveCycles();
+  if(typeof reconcileTjDebts==='function')reconcileTjDebts(); // cargos tj del ciclo muerto devuelven su disponible
+  cycEdit=false;
+  const destino=idCicloPresente()||cycles[Math.min(k,cycles.length-1)].id;
+  // Switch MANUAL (no switchCycle): switchCycle guarda el ciclo saliente antes de cambiar,
+  // lo que RESUCITARÍA al muerto bajo su llave. Aquí el saliente ya no debe existir.
+  activeQ=destino; localStorage.setItem('midas_active_cycle',activeQ);
+  d=load(activeQ); sanitizePaid(); history=[];
+  render(); if(typeof renderDebts==='function')renderDebts(); updateUndo();
 }
 function switchCycle(id){if(id===activeQ)return;save();activeQ=id;d=load(activeQ);sanitizePaid();
   // Ciclos futuros que ya existían cuando nació la meta también heredan su cuota (al visitarlos)
@@ -2779,6 +2828,7 @@ document.getElementById('cyclebar').addEventListener('click',e=>{const b=e.targe
   else if(b.dataset.cycnav!==undefined){const i=cycles.findIndex(c=>c.id===activeQ)+(+b.dataset.cycnav);if(i>=0&&i<cycles.length)switchCycle(cycles[i].id);}
   else if(b.dataset.gohoy){const id=idCicloPresente();if(id&&id!==activeQ)switchCycle(id);}
   else if(b.dataset.cycedit){cycEdit=!cycEdit;renderCycleBar();}
+  else if(b.dataset.cycdel){borrarCicloActivo();}
   else if(b.dataset.cyctype){const c=cycleOf(activeQ);c.type=b.dataset.cyctype;saveCycles();renderCycleBar();recompute();}
   else if(b.dataset.cyceditdone){cycEdit=false;renderCycleBar();recompute();}
   else if(b.dataset.cerrar){cycEdit=false;renderCycleBar();openCierre();} // Cerrar ciclo desde el editor
