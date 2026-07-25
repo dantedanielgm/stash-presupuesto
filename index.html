@@ -956,7 +956,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-23.4'; // vista de año: la fecha del header ahora es una píldora-botón; cada mes tiene "+" para crear un ciclo ahí (Mes / Q1 / Q2) // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-23.5'; // regla de meses: "+" solo en meses VACÍOS y con 2 opciones — Mes entero o Quincenas (crea Q1+Q2 juntas); nunca quincenas sueltas ni ciclos encima de lo que ya hay // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -1023,7 +1023,8 @@ function createCycleInMonth(y,m,type,half){
   else if(half===1){start=y+'-'+pad2(m)+'-01';end=y+'-'+pad2(m)+'-15';}
   else{start=y+'-'+pad2(m)+'-16';end=y+'-'+pad2(m)+'-'+pad2(lastDay(y,m));}
   if(cycles.some(c=>c.start===start&&c.end===end))return null; // ya existe ese rango exacto
-  const id='c'+Date.now(), n=cycles.filter(c=>c.type===type).length+1;
+  // id único aunque se creen 2 ciclos en el MISMO milisegundo (caso "Quincenas": Q1+Q2 juntas)
+  const id='c'+Date.now()+(half?'h'+half:''), n=cycles.filter(c=>c.type===type).length+1;
   cycles.push({id,type,start,end,label:(type==='m'?'Mes ':type==='q'?'Quincena ':'Periodo ')+n});
   cycles.sort((a,b)=>(a.start||'')<(b.start||'')?-1:1); // mantener la barra en orden cronológico
   saveCycles();
@@ -1047,14 +1048,16 @@ function renderYear(){
         const st=cycleStatusOf(c.id);
         return '<button class="yr-chip yr-'+st+(c.id===activeQ?' yr-active':'')+'" data-gocycle2="'+c.id+'" title="'+esc(cycleLabel(c))+'">'+(CYC_BADGE[st]||'')+' '+(+c.start.slice(8,10))+'–'+(+c.end.slice(8,10))+'</button>';
       }).join(''):'')+
-      // "+ ciclo" en cada mes (DD 23 jul): toca el + y elige mes entero, 1ª o 2ª quincena AHÍ mismo.
-      (adding
-        ? '<div class="yr-add"><button class="yr-addopt" data-yradd="'+mk+'-m">'+tx('Mes','Month')+'</button><button class="yr-addopt" data-yradd="'+mk+'-q1">Q1</button><button class="yr-addopt" data-yradd="'+mk+'-q2">Q2</button></div>'
-        : '<button class="yr-plus" data-yrplus="'+mk+'">+</button>')+
+      // "+ ciclo" SOLO en meses VACÍOS (regla DD 23 jul: un mes = 1 ciclo mensual o 2 quincenas
+      // completas, nunca a medias ni encima de lo que ya hay — menos opciones, menos bugs).
+      // "Quincenas" crea Q1 y Q2 JUNTAS automáticamente; no existe elegir una suelta.
+      (list.length?'':(adding
+        ? '<div class="yr-add"><button class="yr-addopt" data-yradd="'+mk+'-m">'+tx('Mes','Month')+'</button><button class="yr-addopt" data-yradd="'+mk+'-qq">'+tx('Quincenas','Halves')+'</button></div>'
+        : '<button class="yr-plus" data-yrplus="'+mk+'">+</button>'))+
       '</div>';
   }
   h+='</div>'+
-    '<div class="ci-note" style="margin-top:.6rem">'+tx('Toca <b>+</b> en un mes para crear un ciclo (mes entero, Q1 o Q2) ahí.','Tap <b>+</b> on a month to create a cycle (whole month, Q1 or Q2) there.')+'</div>'+
+    '<div class="ci-note" style="margin-top:.6rem">'+tx('Toca <b>+</b> en un mes vacío: <b>Mes</b> crea el ciclo mensual · <b>Quincenas</b> crea las dos (Q1 y Q2) de una.','Tap <b>+</b> on an empty month: <b>Month</b> creates the monthly cycle · <b>Halves</b> creates both (Q1 and Q2) at once.')+'</div>'+
     '<div class="ci-note" style="margin-top:.35rem">✅ '+tx('cerrado','closed')+' · 🔵 '+tx('en curso','current')+' · 📅 '+tx('vencido sin cerrar','ended, open')+' · 🔮 '+tx('futuro','future')+'</div>'+
     '<div class="ci-btns"><button class="ci-go" data-yrclose="1">'+tx('Listo','Done')+'</button></div>';
   el.innerHTML=h;
@@ -1069,9 +1072,10 @@ function renderYear(){
     const nv=e.target.closest('[data-yrnav]'); if(nv){yearView+=+nv.dataset.yrnav;renderYear();return;}
     const yp=e.target.closest('[data-yrplus]'); if(yp){yrAddMonth=(yrAddMonth===yp.dataset.yrplus)?null:yp.dataset.yrplus;renderYear();return;} // abre/cierra el mini-picker del mes
     const ya=e.target.closest('[data-yradd]'); if(ya){const pp=ya.dataset.yradd.split('-'),Y=+pp[0],M=+pp[1],k=pp[2];
-      const id=createCycleInMonth(Y,M,k==='m'?'m':'q',k==='q1'?1:(k==='q2'?2:0));
+      // "m" = mes entero · "qq" = LAS DOS quincenas de una (regla DD: nunca una quincena suelta)
+      if(k==='m')createCycleInMonth(Y,M,'m');
+      else{createCycleInMonth(Y,M,'q',1);createCycleInMonth(Y,M,'q',2);}
       yrAddMonth=null; renderYear(); if(typeof renderCycleBar==='function')renderCycleBar();
-      if(id===null)alert(tx('Ya existe un ciclo con ese rango en ese mes.','A cycle with that range already exists in that month.'));
       return;}
     const gc=e.target.closest('[data-gocycle2]'); if(gc){ov.hidden=true;switchCycle(gc.dataset.gocycle2);window.scrollTo({top:0,behavior:'smooth'});}
   });
