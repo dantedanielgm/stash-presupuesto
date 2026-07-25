@@ -833,6 +833,13 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 #settingsbtn{position:absolute; top:21px; right:0; width:34px; height:34px; border-radius:50%; border:1px solid var(--line); background:transparent; cursor:pointer; font-size:16px; line-height:1; color:var(--tx2); transition:.15s}
 #settingsbtn:hover{border-color:var(--accent); color:var(--accent); transform:rotate(30deg)}
 .set-h{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--tx3); margin:1rem 0 .45rem}
+/* Día de corte (⚙ Ajustes y onboarding): un solo número, sin ceremonia */
+.set-corte{display:flex; align-items:center; gap:.5rem; font-size:13px; color:var(--tx2)}
+.set-corte input{width:64px; font:inherit; font-size:16px; font-weight:800; color:var(--tx); text-align:center; background:transparent; border:1px solid var(--line); border-radius:8px; padding:.35rem}
+.set-corte input:focus{outline:none; border-color:var(--accent)}
+.wel-corte{flex-direction:row; align-items:center; gap:.45rem; flex-wrap:wrap}
+.wel-corte input{width:58px; font:inherit; font-size:15px; font-weight:800; color:var(--tx); text-align:center; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:.3rem}
+.wel-corte input:focus{outline:none; border-color:var(--accent)}
 /* Vista macro del año — cuadrícula de calendario (tocar la fecha de arriba) */
 .yr-head{display:flex; align-items:center; justify-content:center; gap:.8rem}
 .yr-nav{font:inherit; font-size:18px; background:transparent; border:1px solid var(--line); border-radius:8px; width:32px; height:32px; cursor:pointer; color:var(--tx2); line-height:1}
@@ -959,7 +966,7 @@ body.welcoming .tabbar,body.welcoming .head{display:none}
 // ===== Idioma (i18n ligera) =====
 // tx('español','english'): el español vive inline como fuente de verdad; el inglés viaja al lado.
 // Sin diccionarios separados que se desincronicen. lang se elige en el onboarding y con el botón 🌐.
-const APP_BUILD='2026-07-23.6'; // 🗑 Borrar ciclo (en el ✎): devuelve la plata que movió (llegadas, pagos de deuda, apartados) y salta al presente; bloqueado en cerrados y si es el único // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
+const APP_BUILD='2026-07-23.7'; // DÍA DE CORTE: murió "Personalizado" — tus ciclos empiezan el día que elijas (1 por defecto, 7 si te pagan el 7) y todo lo obedece; se cambia en ⚙ Ajustes y pregunta si ajusta el ciclo en curso // sello visible en ⚙ Ajustes — para saber SIN adivinar si el celular tiene la versión nueva o caché
 const LANG_KEY='midas_lang';
 let lang=localStorage.getItem(LANG_KEY)||'es';
 function tx(es,en){return lang==='en'&&en!=null?en:es;}
@@ -986,6 +993,11 @@ function renderSettings(){
     '<div class="wel-modes"><button class="wel-mode'+(lang==='es'?' on':'')+'" data-setlang="es">Español</button><button class="wel-mode'+(lang==='en'?' on':'')+'" data-setlang="en">English</button></div>'+
     '<div class="set-h">'+tx('Tema','Theme')+'</div>'+
     '<div class="wel-modes"><button class="wel-mode'+(!dark?' on':'')+'" data-settheme="light">☀️ '+tx('Claro','Light')+'</button><button class="wel-mode'+(dark?' on':'')+'" data-settheme="dark">🌙 '+tx('Oscuro','Dark')+'</button></div>'+
+    // Día de corte (23 jul): cambiarlo aquí manda para los ciclos NUEVOS; si el ciclo en curso
+    // no calza con el corte nuevo, la app PREGUNTA si lo ajusta (decisión de DD: opción b).
+    '<div class="set-h">'+tx('Mis ciclos empiezan el día','My cycles start on day')+'</div>'+
+    '<div class="set-corte"><input type="number" id="set-corte" min="1" max="28" step="1" value="'+corteDia+'"><span>'+tx('de cada mes','of each month')+'</span></div>'+
+    '<div class="ci-note" style="margin:.25rem 0 .2rem">'+tx('Cambia solo los ciclos que crees de ahora en adelante — si te mudas de trabajo y ahora te pagan el 7, ponlo aquí.','Only affects cycles you create from now on — if you switch jobs and now get paid on the 7th, set it here.')+'</div>'+
     '<div class="set-h">📋 '+tx('Plantillas','Templates')+'</div>'+
     (t.length?'<div class="tpl-list">'+t.map(x=>'<span class="tpl-item"><button class="tpl-load" data-loadtpl="'+esc(x.name)+'">'+esc(x.name)+'</button><button class="tpl-del" data-deltpl="'+esc(x.name)+'" aria-label="'+tx('Borrar','Delete')+'">&times;</button></span>').join('')+'</div>'
       :'<div class="tpl-empty">'+tx('Arma una quincena y guárdala como plantilla para reusar su estructura.','Set up a cycle and save it as a template to reuse its structure.')+'</div>')+
@@ -1012,19 +1024,57 @@ document.getElementById('settingsbtn').addEventListener('click',()=>{renderSetti
     else if(b.dataset.export){exportData();renderSettings();}
     else if(b.dataset.import){const fi=document.getElementById('importfile');if(fi)fi.click();}
     else if(b.dataset.reset){if(confirm(tx('¿Reiniciar esta quincena? Se borran los montos actuales.','Reset this cycle? Current amounts will be wiped.'))){snapshot();d=def();save();render();ov.hidden=true;}}
+  });
+  // Día de corte: al soltar el campo (change, no input — para no disparar con cada tecla) guarda y,
+  // si el ciclo EN CURSO no arranca en ese día, PREGUNTA si lo ajusta (decisión de DD: opción b).
+  ov.addEventListener('change',e=>{
+    const t=e.target; if(!t||t.id!=='set-corte')return;
+    const v=parseInt(t.value); if(isNaN(v))return;
+    const nuevo=Math.min(Math.max(v,1),28);
+    if(nuevo===corteDia){t.value=corteDia;return;}
+    corteDia=nuevo; saveCorte(); t.value=corteDia;
+    // ¿El ciclo activo (vivo, no cerrado) arranca en otro día? Ofrecer re-encajarlo al corte nuevo.
+    const c=cycleOf(activeQ);
+    if(c&&c.start&&!d.closed&&+c.start.slice(8,10)!==corteDia){
+      const p=c.start.split('-'), y=+p[0], m=+p[1];
+      // Mismo tipo, mismo mes de arranque; la mitad se deduce de si hoy cae en la 1ª o 2ª ventana.
+      const half=(c.type==='q')?((+c.start.slice(8,10))<corteDia+8?1:2):0;
+      const r=rangoCiclo(y,m,c.type==='m'?'m':'q',half);
+      if(confirm(tx('¿Ajusto también el ciclo en curso? Pasaría de '+fmtFecha(c.start)+'–'+fmtFecha(c.end)+' a '+fmtFecha(r.start)+'–'+fmtFecha(r.end)+'.',
+                    'Adjust the current cycle too? It would go from '+fmtFecha(c.start)+'–'+fmtFecha(c.end)+' to '+fmtFecha(r.start)+'–'+fmtFecha(r.end)+'.'))){
+        c.start=r.start; c.end=r.end; saveCycles(); renderCycleBar(); recompute();
+      }
+    }
+    renderSettings();
   });})();
 document.getElementById('importfile').addEventListener('change',e=>{if(e.target.files&&e.target.files[0])importData(e.target.files[0]);});
 // ===== 📅 Vista macro del año: tocar la fecha de arriba abre los 12 meses con sus ciclos =====
+// ===== DÍA DE CORTE (23 jul) — "lo que varía no es la duración, es el día de corte" (DD).
+// Un ciclo del 7 al 6 NO es un ciclo raro: es un MES que empieza el 7. Del 7 al 21 es una QUINCENA
+// que empieza el 7. Así el modelo se mantiene en 2 tipos (mes/quincena) y se acomoda a cualquier
+// calendario de pago — por eso murió "Personalizado". Se guarda una vez y toda la app obedece.
+let corteDia=Math.min(Math.max(parseInt(localStorage.getItem('midas_corte'))||1,1),28);
+function saveCorte(){localStorage.setItem('midas_corte',String(corteDia));}
+// Rango de un ciclo que ARRANCA en (y,m,dia-de-corte). Mes: hasta el día anterior del mes siguiente.
+// Quincena: 1ª = corte → corte+14; 2ª = corte+15 → día antes del corte del mes siguiente.
+// Corte tope 28 para que exista en todos los meses (incluido febrero) — sin casos imposibles.
+function rangoCiclo(y,m,type,half){
+  const dc=Math.min(Math.max(corteDia,1),28);
+  const ini=new Date(y,m-1,dc);
+  let fin;
+  if(type==='m'){fin=new Date(y,m,dc); fin.setDate(fin.getDate()-1);}          // mes entero: corte a corte
+  else if(half===1){fin=new Date(ini); fin.setDate(fin.getDate()+14);}          // 1ª quincena: 15 días
+  else{ini.setDate(ini.getDate()+15); fin=new Date(y,m,dc); fin.setDate(fin.getDate()-1);} // 2ª: resto del mes
+  return {start:isoOf(ini), end:isoOf(fin)};
+}
 let yearView=new Date().getFullYear();
 let yrAddMonth=null; // "y-m" del mes cuyo mini-picker de "+ ciclo" está abierto (uno a la vez)
 // Crea un ciclo en un MES específico del calendario (no "hoy"): mes completo, 1ª o 2ª quincena.
 // half: 1 = días 1–15 · 2 = días 16–fin · 0/undefined + type 'm' = mes entero. Evita duplicar un
 // ciclo con el MISMO rango exacto (no re-crea lo que ya existe ahí).
 function createCycleInMonth(y,m,type,half){
-  let start,end;
-  if(type==='m'){start=y+'-'+pad2(m)+'-01';end=y+'-'+pad2(m)+'-'+pad2(lastDay(y,m));}
-  else if(half===1){start=y+'-'+pad2(m)+'-01';end=y+'-'+pad2(m)+'-15';}
-  else{start=y+'-'+pad2(m)+'-16';end=y+'-'+pad2(m)+'-'+pad2(lastDay(y,m));}
+  const r=rangoCiclo(y,m,type,half); // respeta tu día de corte (1 por defecto; 7 si te pagan el 7…)
+  const start=r.start, end=r.end;
   if(cycles.some(c=>c.start===start&&c.end===end))return null; // ya existe ese rango exacto
   // id único aunque se creen 2 ciclos en el MISMO milisegundo (caso "Quincenas": Q1+Q2 juntas)
   const id='c'+Date.now()+(half?'h'+half:''), n=cycles.filter(c=>c.type===type).length+1;
@@ -1218,12 +1268,12 @@ function renderCycleBar(){
             ? '▸ '+dn+' '+(dn===1?tx('ciclo DESPUÉS del actual','cycle AFTER current'):tx('ciclos DESPUÉS del actual','cycles AFTER current'))
             : '◂ '+(-dn)+' '+(-dn===1?tx('ciclo ANTES del actual','cycle BEFORE current'):tx('ciclos ANTES del actual','cycles BEFORE current'));})()
       : '● '+tx('ciclo actual','current cycle'))+'</div>'+
-    // Un solo "+" (crear ciclo) — al tocarlo despliega las 3 opciones. Tres botones crípticos
-    // (+Q/+M/+P) siempre visibles eran ruido y se confundían con el ✎ (que edita el actual).
+    // Un solo "+" (crear ciclo) — al tocarlo despliega las opciones. Solo Quincena/Mes:
+    // "Personalizado" murió (23 jul) — el DÍA DE CORTE (⚙ Ajustes) cubre los calendarios raros.
     '<div class="cyc-addrow">'+(cycAddOpen
       ? (function(){ // el tipo de tu ÚLTIMO ciclo va primero — lo normal es continuar el ritmo que llevas
           const lt=(cycles[cycles.length-1]||{}).type||'q';
-          return [['q',tx('Quincena','Half-month')],['m',tx('Mes','Month')],['c',tx('Personalizado','Custom')]]
+          return [['q',tx('Quincena','Half-month')],['m',tx('Mes','Month')]]
             .sort((a,b)=>(a[0]===lt?0:1)-(b[0]===lt?0:1))
             .map(o=>'<button class="cyc-add" data-addcycle="'+o[0]+'">'+o[1]+(o[0]===lt?' ✓':'')+'</button>').join('');
         })()+
@@ -1236,7 +1286,9 @@ function renderCycleBar(){
 function cycEditH(c){
   const tp=(t,l)=>'<button class="ce-mode'+(c.type===t?' on':'')+'" data-cyctype="'+t+'">'+l+'</button>';
   return '<div class="cyc-editor">'+
-    '<div class="ce-modes">'+tp('q',tx('Quincena','Half-month'))+tp('m',tx('Mes','Month'))+tp('c',tx('Periodo','Period'))+'</div>'+
+    // Solo Quincena/Mes: "Periodo" libre murió (23 jul) — un idioma en toda la app. Las fechas
+    // exactas se siguen ajustando abajo (Desde/Hasta) para casos puntuales de ESTE ciclo.
+    '<div class="ce-modes">'+tp('q',tx('Quincena','Half-month'))+tp('m',tx('Mes','Month'))+'</div>'+
     '<div class="ce-dates">'+
       '<label class="ce-l">'+tx('Desde','From')+'<input type="date" data-cycdate="start" value="'+(c.start||'')+'"></label>'+
       '<label class="ce-l">'+tx('Hasta','To')+'<input type="date" data-cycdate="end" value="'+(c.end||'')+'"></label>'+
@@ -1442,9 +1494,13 @@ function load(q){
 function cycleForToday(){const hoy=isoToday();const c=cycles.find(x=>x.start&&x.end&&x.start<=hoy&&hoy<=x.end);return c?c.id:null;}
 function createCycleForToday(type){
   const hoy=isoToday(), p=hoy.split('-'), y=+p[0], m=+p[1], dd=+p[2];
-  let start,end;
-  if(type==='m'){start=y+'-'+pad2(m)+'-01';end=y+'-'+pad2(m)+'-'+pad2(lastDay(y,m));}
-  else{ if(dd<=15){start=y+'-'+pad2(m)+'-01';end=y+'-'+pad2(m)+'-15';} else {start=y+'-'+pad2(m)+'-16';end=y+'-'+pad2(m)+'-'+pad2(lastDay(y,m));} }
+  // Respeta el día de corte: la ventana que CONTIENE hoy (si hoy < corte, el ciclo arrancó el mes pasado)
+  let ry=y, rm=m;
+  if(dd<corteDia){rm--; if(rm<1){rm=12;ry--;}}
+  let half=0;
+  if(type!=='m'){const r1=rangoCiclo(ry,rm,'q',1); half=(hoy<=r1.end)?1:2;}
+  const rr=rangoCiclo(ry,rm,type==='m'?'m':'q',half);
+  let start=rr.start,end=rr.end;
   const id='c'+Date.now(), n=cycles.filter(c=>c.type===type).length+1;
   cycles.push({id,type,start,end,label:(type==='m'?'Mes ':type==='q'?'Quincena ':'Periodo ')+n});saveCycles();
   const nd=def();if(typeof seedMetaQuotas==='function')seedMetaQuotas(nd,{type:type,start:start}); // metas con fecha heredan su cuota
@@ -4028,9 +4084,12 @@ function showWelcome(show){const w=document.getElementById('welcome');if(w)w.hid
 let welMode='m', welHalf=(new Date().getDate()<=15?1:2), welMonth='', welMonto=0;
 function welPeriodH(){
   const mo='<label class="wel-pl">'+tx('Mes','Month')+'<input type="month" id="wel-month" value="'+welMonth+'"></label>';
-  if(welMode==='m')return mo;
-  if(welMode==='q')return mo+'<div class="wel-half"><button data-welhalf="1" class="'+(welHalf===1?'on':'')+'">'+tx('1ra · 1–15','1st · 1–15')+'</button><button data-welhalf="2" class="'+(welHalf===2?'on':'')+'">'+tx('2da · 16–fin','2nd · 16–end')+'</button></div>';
-  return '<label class="wel-pl">'+tx('Desde','From')+'<input type="date" id="wel-from"></label><label class="wel-pl">'+tx('Hasta','To')+'<input type="date" id="wel-to"></label>';
+  // Día de corte (23 jul): murió "Personalizado" — lo que varía es el DÍA en que empieza tu ciclo,
+  // no su duración. Default 1; quien cobra el 7 pone 7 y sus ciclos van del 7 al 6 (o 7 al 21).
+  const dc='<label class="wel-pl wel-corte">'+tx('Empieza el día','Starts on day')+
+    '<input type="number" id="wel-corte" min="1" max="28" step="1" value="'+corteDia+'"> '+tx('de cada mes','of each month')+'</label>';
+  const half=(welMode==='q')?'<div class="wel-half"><button data-welhalf="1" class="'+(welHalf===1?'on':'')+'">'+tx('1ra','1st')+'</button><button data-welhalf="2" class="'+(welHalf===2?'on':'')+'">'+tx('2da','2nd')+'</button></div>':'';
+  return mo+half+dc;
 }
 function renderWelPeriod(){const e=document.getElementById('wel-period');if(e)e.innerHTML=welPeriodH();
   document.querySelectorAll('.wel-mode[data-welmode]').forEach(b=>b.classList.toggle('on',b.dataset.welmode===welMode));}
@@ -4040,10 +4099,9 @@ function applyWelcomeLang(){
   s('wel-q1',tx('¿Cuánta plata vas a repartir?','How much money are you splitting up?'));
   s('wel-sub1',tx('Tu sueldo, o el monto que quieras organizar.','Your paycheck, or any amount you want to organize.'));
   s('wel-q2',tx('¿Qué periodo cubre?','What period does it cover?'));
-  s('wel-modes',
+  s('wel-modes', // "Personalizado" MURIÓ (23 jul): solo mes o quincena — el día de corte cubre el resto
     '<button class="wel-mode'+(welMode==='m'?' on':'')+'" data-welmode="m">'+tx('Un mes','One month')+'</button>'+
-    '<button class="wel-mode'+(welMode==='q'?' on':'')+'" data-welmode="q">'+tx('Una quincena','Half a month')+'</button>'+
-    '<button class="wel-mode'+(welMode==='c'?' on':'')+'" data-welmode="c">'+tx('Personalizado','Custom')+'</button>');
+    '<button class="wel-mode'+(welMode==='q'?' on':'')+'" data-welmode="q">'+tx('Una quincena','Half a month')+'</button>');
   s('wel-go',tx('Empezar →','Start →'));
   s('wel-foot',tx('Stash reparte tu plata con la regla <b>20/50/30</b>: el ahorro sale primero, luego lo esencial, luego los gustos. Es la 50/30/20 de Harvard (Elizabeth Warren), volteada para <b>pagarte a ti primero</b>.',
     'Stash splits your money with the <b>20/50/30</b> rule: savings come out first, then essentials, then wants. It\'s Harvard\'s 50/30/20 (Elizabeth Warren), flipped so you <b>pay yourself first</b>.'));
@@ -4052,17 +4110,14 @@ function applyWelcomeLang(){
 }
 function finishOnboarding(){
   welMonto=parseFloat((document.getElementById('wel-monto')||{}).value)||0;
-  let start='', end='', type=welMode;
-  if(welMode==='m'||welMode==='q'){
-    const mv=(document.getElementById('wel-month')||{}).value||welMonth;
-    const pp=mv.split('-'), y=+pp[0], m=+pp[1];
-    if(welMode==='m'){ start=mv+'-01'; end=mv+'-'+String(lastDay(y,m)).padStart(2,'0'); }
-    else if(welHalf===1){ start=mv+'-01'; end=mv+'-15'; }
-    else { start=mv+'-16'; end=mv+'-'+String(lastDay(y,m)).padStart(2,'0'); }
-  } else {
-    start=(document.getElementById('wel-from')||{}).value||'';
-    end=(document.getElementById('wel-to')||{}).value||'';
-  }
+  const type=(welMode==='q')?'q':'m'; // solo mes o quincena (Personalizado murió)
+  // El día de corte elegido aquí manda para TODOS los ciclos que se creen después
+  const dcInp=parseInt((document.getElementById('wel-corte')||{}).value);
+  corteDia=Math.min(Math.max(isNaN(dcInp)?1:dcInp,1),28); saveCorte();
+  const mv=(document.getElementById('wel-month')||{}).value||welMonth;
+  const pp=mv.split('-'), y=+pp[0], m=+pp[1];
+  const r=rangoCiclo(y,m,type,welHalf);
+  const start=r.start, end=r.end;
   cycles=[{id:'c1',type:type,start:start,end:end,label:tx('Ciclo 1','Cycle 1')}];saveCycles();
   activeQ='c1';localStorage.setItem('midas_active_cycle',activeQ);localStorage.setItem('midas_onboarded','1');
   d=def(); d.inc=[{l:tx('Presupuesto','Budget'),a:welMonto}]; save();
